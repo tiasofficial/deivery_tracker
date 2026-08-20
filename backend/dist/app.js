@@ -10,14 +10,17 @@ const morgan_1 = __importDefault(require("morgan"));
 const errorHandler_1 = require("./middleware/errorHandler");
 const routes_1 = __importDefault(require("./routes"));
 const app = (0, express_1.default)();
+// Health check — MUST be first, before all middleware, to keep Render alive via cron job
+app.get('/', (_req, res) => {
+    res.status(200).json({ status: 'ok', message: 'DeliveryTracker API is running' });
+});
+app.get('/health', (_req, res) => {
+    res.status(200).json({ status: 'ok', message: 'DeliveryTracker API is running' });
+});
 app.use((0, cors_1.default)());
 app.use((0, helmet_1.default)());
 app.use((0, morgan_1.default)('dev'));
 app.use(express_1.default.json());
 app.use('/api', routes_1.default);
-// Health check — keeps Render server alive via cron job ping
-app.get('/', (_req, res) => {
-    res.status(200).json({ status: 'ok', message: 'DeliveryTracker API is running' });
-});
 app.use(errorHandler_1.errorHandler);
 exports.default = app;
