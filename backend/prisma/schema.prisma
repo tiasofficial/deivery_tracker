@@ -1,0 +1,130 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  VENDOR
+  DRIVER
+}
+
+enum TripStatus {
+  ASSIGNED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  SETTLED
+  CANCELLED
+}
+
+enum StopStatus {
+  PENDING
+  ARRIVED
+  DELIVERED
+  COLLECTED
+  SKIPPED
+}
+
+model User {
+  id            String       @id @default(uuid())
+  name          String
+  email         String       @unique
+  phone         String?
+  password      String
+  role          Role
+  vehicleNo     String?
+  vendorId      String?
+  vendor        User?        @relation("VendorDrivers", fields: [vendorId], references: [id])
+  drivers       User[]       @relation("VendorDrivers")
+  tripsAsDriver Trip[]       @relation("DriverTrips")
+  tripsAsVendor Trip[]       @relation("VendorTrips")
+  settlements   Settlement[]
+  merchants     Merchant[]
+  boxTypes      BoxType[]
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Merchant {
+  id        String      @id @default(uuid())
+  name      String
+  address   String
+  phone     String?
+  vendorId  String
+  vendor    User        @relation(fields: [vendorId], references: [id])
+  stops     RouteStop[]
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model BoxType {
+  id          String         @id @default(uuid())
+  name        String
+  description String?
+  vendorId    String
+  vendor      User           @relation(fields: [vendorId], references: [id])
+  stopBoxes   RouteStopBox[]
+  createdAt   DateTime       @default(now())
+}
+
+model Trip {
+  id             String      @id @default(uuid())
+  vendorId       String
+  vendor         User        @relation("VendorTrips", fields: [vendorId], references: [id])
+  driverId       String
+  driver         User        @relation("DriverTrips", fields: [driverId], references: [id])
+  tripDate       DateTime
+  transportFee   Decimal     @db.Decimal(10, 2)
+  status         TripStatus  @default(ASSIGNED)
+  totalCollected Decimal?    @db.Decimal(10, 2)
+  isSettled      Boolean     @default(false)
+  notes          String?
+  stops          RouteStop[]
+  settlement     Settlement?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model RouteStop {
+  id              String         @id @default(uuid())
+  tripId          String
+  trip            Trip           @relation(fields: [tripId], references: [id])
+  merchantId      String
+  merchant        Merchant       @relation(fields: [merchantId], references: [id])
+  stopOrder       Int
+  status          StopStatus     @default(PENDING)
+  collectedAmount Decimal?       @db.Decimal(10, 2)
+  collectedAt     DateTime?
+  skipped         Boolean        @default(false)
+  skipReason      String?
+  arrivedAt       DateTime?
+  deliveredAt     DateTime?
+  boxes           RouteStopBox[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+model RouteStopBox {
+  id          String    @id @default(uuid())
+  stopId      String
+  stop        RouteStop @relation(fields: [stopId], references: [id])
+  boxTypeId   String
+  boxType     BoxType   @relation(fields: [boxTypeId], references: [id])
+  quantity    Int
+}
+
+model Settlement {
+  id         String   @id @default(uuid())
+  tripId     String   @unique
+  trip       Trip     @relation(fields: [tripId], references: [id])
+  driverId   String
+  driver     User     @relation(fields: [driverId], references: [id])
+  vendorId   String
+  amount     Decimal  @db.Decimal(10, 2)
+  settledAt  DateTime @default(now())
+  notes      String?
+}
