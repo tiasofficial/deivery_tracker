@@ -111,8 +111,10 @@ export const updateTrip = async (tripId: string, vendorId: string, data: any) =>
     data: {
       driverId: data.driverId,
       tripDate: data.tripDate ? new Date(data.tripDate) : undefined,
-      transportFee: data.transportFee,
+      transportFee: data.transportFee !== undefined ? data.transportFee : undefined,
       notes: data.notes,
+      // Allow vendor to correct collected amount before settling
+      totalCollected: data.totalCollected !== undefined ? data.totalCollected : undefined,
     },
   });
 };

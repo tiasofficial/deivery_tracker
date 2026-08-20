@@ -72,7 +72,7 @@ export default function AnalyticsDashboard() {
     const sorted = [...collections].sort((a, b) => new Date(a.tripDate).getTime() - new Date(b.tripDate).getTime());
     const sliced = sorted.slice(-6); // Take latest 6 entries
     
-    const revenueData = sliced.map(c => Number(c.totalCollected || 0));
+    const revenueData = sliced.map(c => Math.max(0, Number(c.totalCollected || 0) - Number(c.transportFee || 0)));
     const days = sliced.map(c => {
       const date = new Date(c.tripDate);
       return `${date.getDate()}/${date.getMonth() + 1}`;

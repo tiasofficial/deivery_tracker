@@ -9,13 +9,15 @@ export const getSummary = async (vendorId: string, period: string) => {
 
   const totalTrips = trips.length;
   
+  // Net collection = totalCollected minus transportFee (what vendor actually receives)
   const totalCollection = trips
     .filter(t => t.status === 'COMPLETED' || t.status === 'SETTLED')
-    .reduce((acc, trip) => acc + Number(trip.totalCollected || 0), 0);
+    .reduce((acc, trip) => acc + Number(trip.totalCollected || 0) - Number(trip.transportFee || 0), 0);
 
+  // Unsettled balance also uses net amount
   const unsettledBalance = trips
     .filter(t => t.status === 'COMPLETED' && !t.isSettled)
-    .reduce((acc, trip) => acc + Number(trip.totalCollected || 0), 0);
+    .reduce((acc, trip) => acc + Number(trip.totalCollected || 0) - Number(trip.transportFee || 0), 0);
 
   const activeDriverIds = new Set(
     trips
@@ -28,11 +30,13 @@ export const getSummary = async (vendorId: string, period: string) => {
 };
 
 export const getCollections = async (vendorId: string, from: string, to: string) => {
-  const where: any = { vendorId, status: 'COMPLETED' };
+  // Include both COMPLETED and SETTLED so chart shows all finished trips
+  const where: any = { vendorId, status: { in: ['COMPLETED', 'SETTLED'] } };
   if (from && to) {
-    where.createdAt = { gte: new Date(from), lte: new Date(to) };
+    // Filter by tripDate (the actual delivery date), not createdAt
+    where.tripDate = { gte: new Date(from), lte: new Date(to) };
   }
-  const trips = await prisma.trip.findMany({ where, select: { id: true, tripDate: true, totalCollected: true } });
+  const trips = await prisma.trip.findMany({ where, select: { id: true, tripDate: true, totalCollected: true, transportFee: true } });
   return trips;
 };
 

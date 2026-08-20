@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Modal, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { FAB, Button, TextInput, IconButton } from 'react-native-paper';
@@ -131,74 +131,78 @@ export default function DriversList() {
         onPress={() => setModalVisible(true)} 
       />
 
-      {/* ADD DRIVER MODAL */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Driver</Text>
-              <IconButton icon="close" size={20} iconColor={colors.textPrimary} onPress={() => setModalVisible(false)} />
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContent}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add New Driver</Text>
+                <IconButton icon="close" size={20} iconColor={colors.textPrimary} onPress={() => setModalVisible(false)} />
+              </View>
+
+              <ScrollView contentContainerStyle={styles.modalForm} keyboardShouldPersistTaps="handled">
+                <TextInput
+                  label="Full Name *"
+                  value={name}
+                  onChangeText={setName}
+                  mode="outlined"
+                  style={styles.input}
+                />
+                <TextInput
+                  label="Email Address *"
+                  value={email}
+                  onChangeText={setEmail}
+                  mode="outlined"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  style={styles.input}
+                />
+                <TextInput
+                  label="Phone Number"
+                  value={phone}
+                  onChangeText={setPhone}
+                  mode="outlined"
+                  keyboardType="phone-pad"
+                  style={styles.input}
+                />
+                <TextInput
+                  label="Password *"
+                  value={password}
+                  onChangeText={setPassword}
+                  mode="outlined"
+                  secureTextEntry
+                  style={styles.input}
+                />
+                <TextInput
+                  label="Vehicle Number *"
+                  value={vehicleNo}
+                  onChangeText={setVehicleNo}
+                  mode="outlined"
+                  placeholder="e.g. MH 12 AB 1234"
+                  style={styles.input}
+                />
+
+                <Button
+                  mode="contained"
+                  onPress={handleCreateDriver}
+                  loading={createLoading}
+                  disabled={createLoading}
+                  style={styles.createBtn}
+                >
+                  Create Account
+                </Button>
+              </ScrollView>
             </View>
-
-            <ScrollView contentContainerStyle={styles.modalForm}>
-              <TextInput
-                label="Full Name *"
-                value={name}
-                onChangeText={setName}
-                mode="outlined"
-                style={styles.input}
-              />
-              <TextInput
-                label="Email Address *"
-                value={email}
-                onChangeText={setEmail}
-                mode="outlined"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                style={styles.input}
-              />
-              <TextInput
-                label="Phone Number"
-                value={phone}
-                onChangeText={setPhone}
-                mode="outlined"
-                keyboardType="phone-pad"
-                style={styles.input}
-              />
-              <TextInput
-                label="Password *"
-                value={password}
-                onChangeText={setPassword}
-                mode="outlined"
-                secureTextEntry
-                style={styles.input}
-              />
-              <TextInput
-                label="Vehicle Number *"
-                value={vehicleNo}
-                onChangeText={setVehicleNo}
-                mode="outlined"
-                placeholder="e.g. MH 12 AB 1234"
-                style={styles.input}
-              />
-
-              <Button
-                mode="contained"
-                onPress={handleCreateDriver}
-                loading={createLoading}
-                disabled={createLoading}
-                style={styles.createBtn}
-              >
-                Create Account
-              </Button>
-            </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );

@@ -80,8 +80,9 @@ export default function StopDetail() {
       await api.post(`/trips/${tripId}/stops/${stopId}/collect`, {
         amount: parseFloat(collectionAmount)
       });
-      Alert.alert('Completed', 'Stop collection complete and logged.');
-      router.back();
+      // Navigate to trip overview (not just back) so driver sees transport fee input
+      // if this was the last stop. router.replace avoids a stale back-stack entry.
+      router.replace({ pathname: `/driver/trips/[id]`, params: { id: tripId as string } });
     } catch (error: any) {
       Alert.alert('Error', error?.response?.data?.message || 'Failed to submit collection');
     } finally {
