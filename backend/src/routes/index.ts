@@ -6,8 +6,10 @@ import merchantRoutes from './merchant.routes';
 import boxtypeRoutes from './boxtype.routes';
 import analyticsRoutes from './analytics.routes';
 import settlementRoutes from './settlement.routes';
+import testRoutes from './test.routes';
 
 const router = Router();
+router.use('/test-body', testRoutes);
 
 router.use('/auth', authRoutes);
 router.use('/trips', tripRoutes);

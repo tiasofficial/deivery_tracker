@@ -60,7 +60,10 @@ export const startTrip = async (req: AuthRequest, res: Response, next: NextFunct
 export const completeTrip = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { transportFee } = req.body;
-    const fee = transportFee !== undefined ? Number(transportFee) : undefined;
+    let fee: number | undefined = undefined;
+    if (transportFee !== undefined && transportFee !== null && transportFee !== '') {
+      fee = Number(transportFee);
+    }
     const trip = await tripService.updateTripStatus(req.params.id, req.user.id, 'COMPLETED', fee);
     return sendSuccess(res, trip, 'Trip completed');
   } catch (error: any) {
