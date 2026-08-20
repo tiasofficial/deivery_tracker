@@ -14,6 +14,11 @@ app.use(express.json());
 
 app.use('/api', routes);
 
+// Health check — keeps Render server alive via cron job ping
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'ok', message: 'DeliveryTracker API is running' });
+});
+
 app.use(errorHandler);
 
 export default app;
