@@ -15,9 +15,12 @@
 **/android/build/
 **/ios/build/
 
-# Ignore TypeScript build output
-**/dist/
-**/build/
+# Ignore TypeScript build output EXCEPT backend/dist (needed for Render deployment)
+mobile/**/dist/
+mobile/**/build/
+mobile/**/web-build/
+mobile/**/android/build/
+mobile/**/ios/build/
 
 # System files
 **/.DS_Store
