@@ -18,9 +18,9 @@ export default function DriverHistory() {
     try {
       const res = await api.get('/trips');
       if (res.data.success && res.data.data) {
-        // Filter only completed, settled or cancelled trips for history
+        // Filter only settled or cancelled trips for history
         const historyTrips = res.data.data.filter((t: any) => 
-          t.status === 'COMPLETED' || t.status === 'SETTLED' || t.status === 'CANCELLED'
+          t.status === 'SETTLED' || t.status === 'CANCELLED'
         );
         // Sort by date descending (latest completed first)
         historyTrips.sort((a: any, b: any) => new Date(b.tripDate).getTime() - new Date(a.tripDate).getTime());

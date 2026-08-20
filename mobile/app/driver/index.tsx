@@ -24,8 +24,11 @@ export default function DriverDashboard() {
     try {
       const res = await api.get('/trips');
       if (res.data.success && res.data.data) {
-        // Driver only sees their own assigned/active trips
-        setTrips(res.data.data);
+        // Driver sees ASSIGNED, IN_PROGRESS, and COMPLETED on the main page
+        const activeTrips = res.data.data.filter((t: any) => 
+          t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || t.status === 'COMPLETED'
+        );
+        setTrips(activeTrips);
       }
     } catch (error) {
       console.error('Failed to load driver trips:', error);
@@ -53,8 +56,8 @@ export default function DriverDashboard() {
     router.replace('/(auth)/login');
   };
 
-  // Calculate metrics for today
-  const activeTripsCount = trips.filter(t => t.status !== 'COMPLETED' && t.status !== 'SETTLED' && t.status !== 'CANCELLED').length;
+  // Calculate metrics for today (Trips not yet completed)
+  const activeTripsCount = trips.filter(t => t.status !== 'COMPLETED').length;
   
   return (
     <SafeAreaView style={styles.container}>
