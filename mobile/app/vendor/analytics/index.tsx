@@ -68,15 +68,27 @@ export default function AnalyticsDashboard() {
       };
     }
     
-    // Sort collections by date ascending
-    const sorted = [...collections].sort((a, b) => new Date(a.tripDate).getTime() - new Date(b.tripDate).getTime());
-    const sliced = sorted.slice(-6); // Take latest 6 entries
-    
-    const revenueData = sliced.map(c => Math.max(0, Number(c.totalCollected || 0) - Number(c.transportFee || 0)));
-    const days = sliced.map(c => {
+    // Group collections by date
+    const sortableMap: Record<string, { net: number, label: string, ts: number }> = {};
+    collections.forEach(c => {
       const date = new Date(c.tripDate);
-      return `${date.getDate()}/${date.getMonth() + 1}`;
+      const key = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+      if (!sortableMap[key]) {
+        sortableMap[key] = {
+          net: 0,
+          label: `${date.getDate()}/${date.getMonth() + 1}`,
+          ts: new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+        };
+      }
+      const net = Math.max(0, Number(c.totalCollected || 0) - Number(c.transportFee || 0));
+      sortableMap[key].net += net;
     });
+
+    const grouped = Object.values(sortableMap).sort((a, b) => a.ts - b.ts);
+    const sliced = grouped.slice(-6); // Take latest 6 days
+    
+    const revenueData = sliced.map(g => g.net);
+    const days = sliced.map(g => g.label);
 
     // Pad if less than 6 data points
     while (revenueData.length < 6) {
