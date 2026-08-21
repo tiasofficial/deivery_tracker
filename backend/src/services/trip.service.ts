@@ -131,6 +131,10 @@ export const updateTripStatus = async (tripId: string, driverId: string, status:
     include: { stops: true }
   });
   if (!trip || trip.driverId !== driverId) throw new Error('Trip not found or unauthorized');
+  
+  if (trip.isSettled) {
+    throw new Error('Cannot update status of a settled trip');
+  }
 
   const data: any = { status };
 
