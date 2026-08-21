@@ -20,7 +20,25 @@ export default function TripsList() {
   const fetchTrips = async () => {
     try {
       const res = await api.get('/trips');
-      setTrips(res.data.data || []);
+      const data = res.data.data || [];
+      
+      const order: Record<string, number> = { 
+        'ASSIGNED': 1, 
+        'EN_ROUTE': 2, 
+        'IN_PROGRESS': 3, 
+        'COMPLETED': 4, 
+        'SETTLED': 5, 
+        'CANCELLED': 6 
+      };
+
+      data.sort((a: any, b: any) => {
+        const orderA = order[a.status] || 99;
+        const orderB = order[b.status] || 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(b.tripDate).getTime() - new Date(a.tripDate).getTime();
+      });
+
+      setTrips(data);
     } catch (error) {
       console.error('Failed to fetch trips:', error);
     } finally {

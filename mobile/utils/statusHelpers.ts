@@ -3,9 +3,10 @@ import { TripStatus, StopStatus } from '../types';
 
 export const getTripStatusColor = (status: TripStatus) => {
   switch (status) {
-    case 'COMPLETED':
     case 'SETTLED':
       return colors.success;
+    case 'COMPLETED':
+      return colors.warning;
     case 'ASSIGNED':
       return colors.primary;
     case 'EN_ROUTE':
