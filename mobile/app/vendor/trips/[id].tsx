@@ -138,6 +138,28 @@ export default function VendorTripDetail() {
           <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Trip Detail Overview</Text>
+        <TouchableOpacity 
+          onPress={() => {
+            Alert.alert('Delete Trip', 'Are you sure you want to delete this trip permanently?', [
+              { text: 'Cancel', style: 'cancel' },
+              { 
+                text: 'Delete', 
+                style: 'destructive',
+                onPress: async () => {
+                  try {
+                    await api.delete(`/trips/${tripId}`);
+                    router.back();
+                  } catch(err) {
+                    Alert.alert('Error', 'Failed to delete trip');
+                  }
+                }
+              }
+            ]);
+          }}
+          style={{ padding: 8, marginLeft: 'auto' }}
+        >
+          <Text style={{ fontSize: 20 }}>🗑️</Text>
+        </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
