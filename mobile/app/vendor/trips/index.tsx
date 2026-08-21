@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { Ionicons } from '@expo/vector-icons';
@@ -67,10 +67,35 @@ export default function TripsList() {
               onPress={() => router.push(`/vendor/trips/${item.id}`)}
             >
               <View style={styles.cardHeader}>
-                <Text style={styles.driverName}>{item.driver?.name || 'Unassigned'}</Text>
-                <View style={[styles.badge, { backgroundColor: getTripStatusColor(item.status) + '22' }]}>
-                  <Text style={[styles.badgeText, { color: getTripStatusColor(item.status) }]}>{item.status}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={styles.driverName}>{item.driver?.name || 'Unassigned'}</Text>
+                  <View style={[styles.badge, { backgroundColor: getTripStatusColor(item.status) + '22', marginLeft: 8 }]}>
+                    <Text style={[styles.badgeText, { color: getTripStatusColor(item.status) }]}>{item.status}</Text>
+                  </View>
                 </View>
+                <TouchableOpacity 
+                  onPress={(e) => {
+                    e.stopPropagation(); // prevent card press
+                    Alert.alert('Delete Trip', 'Are you sure you want to delete this trip permanently?', [
+                      { text: 'Cancel', style: 'cancel' },
+                      { 
+                        text: 'Delete', 
+                        style: 'destructive',
+                        onPress: async () => {
+                          try {
+                            await api.delete(`/trips/${item.id}`);
+                            fetchTrips();
+                          } catch(err) {
+                            Alert.alert('Error', 'Failed to delete trip');
+                          }
+                        }
+                      }
+                    ]);
+                  }}
+                  style={{ padding: 4 }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
               </View>
               
               <View style={styles.cardBody}>
