@@ -90,8 +90,8 @@ export default function AnalyticsDashboard() {
     const revenueData = sliced.map(g => g.net);
     const days = sliced.map(g => g.label);
 
-    // Pad if less than 6 data points
-    while (revenueData.length < 6) {
+    // If only 1 point, add a dummy 0 point so we can draw a line
+    if (revenueData.length === 1) {
       revenueData.unshift(0);
       days.unshift('-');
     }
@@ -172,20 +172,31 @@ export default function AnalyticsDashboard() {
                 
                 {/* Circle nodes at data points */}
                 {points.map((pt, i) => (
-                  <React.Fragment key={i}>
-                    {revenueData[i] > 0 && (
-                      <Circle cx={pt.x} cy={pt.y} r="5" fill={colors.surface} stroke={colors.primary} strokeWidth="2" />
-                    )}
-                  </React.Fragment>
+                  <Circle key={i} cx={pt.x} cy={pt.y} r="5" fill={colors.surface} stroke={colors.primary} strokeWidth="2" />
                 ))}
               </Svg>
             </View>
             
             {/* Chart X Labels */}
-            <View style={styles.xLabelsRow}>
-              {days.map((day, i) => (
-                <Text key={i} style={styles.xLabel}>{day}</Text>
-              ))}
+            <View style={{ height: 20, marginTop: 12, position: 'relative' }}>
+              {days.map((day, i) => {
+                const pt = points[i];
+                return (
+                  <Text 
+                    key={i} 
+                    style={{ 
+                      position: 'absolute', 
+                      left: pt.x - 25, 
+                      width: 50, 
+                      textAlign: 'center', 
+                      color: colors.textSecondary, 
+                      fontSize: 11 
+                    }}
+                  >
+                    {day}
+                  </Text>
+                );
+              })}
             </View>
           </View>
 
