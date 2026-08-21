@@ -17,7 +17,7 @@ interface StopItem {
   boxes: BoxItem[];
 }
 
-export const BOX_TYPES = ['Bata Box', 'Nirmal Box', 'Bala Box'];
+
 
 export default function CreateTrip() {
   const router = useRouter();
@@ -30,7 +30,6 @@ export default function CreateTrip() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Dynamic Stops State
   const [stops, setStops] = useState<StopItem[]>([
     {
       merchantName: '',
@@ -38,13 +37,15 @@ export default function CreateTrip() {
     }
   ]);
 
-  // Load live drivers from database
+  const [availableBoxTypes, setAvailableBoxTypes] = useState<string[]>(['Bata Box', 'Nirmal Box', 'Bala Box']);
+
+  // Load live drivers and box types from database
   React.useEffect(() => {
-    const fetchDrivers = async () => {
+    const fetchData = async () => {
       try {
-        const res = await api.get('/drivers');
-        if (res.data.success && res.data.data) {
-          const list = res.data.data;
+        const driversRes = await api.get('/drivers');
+        if (driversRes.data.success && driversRes.data.data) {
+          const list = driversRes.data.data;
           setDrivers(list);
           if (list.length > 0) {
             setSelectedDriverId(list[0].id);
@@ -53,8 +54,20 @@ export default function CreateTrip() {
       } catch (error) {
         console.error('Failed to load drivers list:', error);
       }
+      
+      try {
+        const boxTypesRes = await api.get('/boxtypes');
+        if (boxTypesRes.data.success && boxTypesRes.data.data) {
+          const names = boxTypesRes.data.data.map((b: any) => b.name);
+          if (names.length > 0) {
+            setAvailableBoxTypes(names);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to load box types:', error);
+      }
     };
-    fetchDrivers();
+    fetchData();
   }, []);
 
   // Date picker handler
@@ -247,40 +260,51 @@ export default function CreateTrip() {
             <Text style={styles.itemsLabel}>Deliveries at this Stop</Text>
             {stop.boxes.map((box, boxIdx) => (
               <View key={boxIdx} style={styles.boxRow}>
-                {/* Custom Box Type Picker */}
-                <View style={styles.pickerContainer}>
-                  {BOX_TYPES.map(type => {
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <TextInput
+                    label="Item Name"
+                    value={box.boxType}
+                    onChangeText={(text) => updateBoxType(stopIdx, boxIdx, text)}
+                    mode="outlined"
+                    style={{ flex: 1, backgroundColor: colors.surfaceAlt }}
+                    placeholder="Type or select below"
+                  />
+                  <TextInput
+                    label="Qty"
+                    value={box.quantity}
+                    onChangeText={(qty) => updateBoxQuantity(stopIdx, boxIdx, qty)}
+                    mode="outlined"
+                    keyboardType="numeric"
+                    style={styles.qtyInput}
+                  />
+                  {stop.boxes.length > 1 && (
+                    <IconButton
+                      icon="delete"
+                      iconColor={colors.error}
+                      size={20}
+                      onPress={() => removeBoxItem(stopIdx, boxIdx)}
+                      style={{ margin: 0 }}
+                    />
+                  )}
+                </View>
+                
+                {/* Quick Select Chips */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8, paddingBottom: 4 }}>
+                  {availableBoxTypes.map(type => {
                     const isSelected = type === box.boxType;
                     return (
                       <TouchableOpacity
                         key={type}
-                        style={[styles.boxChip, isSelected && styles.boxChipSelected]}
+                        style={[styles.boxChip, isSelected && styles.boxChipSelected, { marginRight: 8 }]}
                         onPress={() => updateBoxType(stopIdx, boxIdx, type)}
                       >
-                        <Text style={[styles.boxChipText, isSelected && styles.boxChipTextSelected]}>{type.split(' ')[0]}</Text>
+                        <Text style={[styles.boxChipText, isSelected && styles.boxChipTextSelected]}>
+                          {type}
+                        </Text>
                       </TouchableOpacity>
                     );
                   })}
-                </View>
-                
-                {/* Quantity Input */}
-                <TextInput
-                  label="Qty"
-                  value={box.quantity}
-                  onChangeText={(qty) => updateBoxQuantity(stopIdx, boxIdx, qty)}
-                  mode="outlined"
-                  keyboardType="numeric"
-                  style={styles.qtyInput}
-                />
-
-                {stop.boxes.length > 1 && (
-                  <IconButton
-                    icon="delete"
-                    iconColor={colors.error}
-                    size={20}
-                    onPress={() => removeBoxItem(stopIdx, boxIdx)}
-                  />
-                )}
+                </ScrollView>
               </View>
             ))}
 
@@ -343,7 +367,7 @@ const styles = StyleSheet.create({
   removeText: { color: colors.error, fontSize: 13 },
   input: { marginBottom: 12, backgroundColor: colors.surfaceAlt },
   itemsLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 8, marginTop: 4 },
-  boxRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  boxRow: { marginBottom: 12 },
   pickerContainer: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   boxChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   boxChipSelected: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
