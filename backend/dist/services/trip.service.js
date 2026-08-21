@@ -120,9 +120,24 @@ const updateTrip = async (tripId, vendorId, data) => {
 };
 exports.updateTrip = updateTrip;
 const deleteTrip = async (tripId, vendorId) => {
-    const trip = await prisma_1.prisma.trip.findUnique({ where: { id: tripId } });
+    const trip = await prisma_1.prisma.trip.findUnique({ where: { id: tripId }, include: { stops: true } });
     if (!trip || trip.vendorId !== vendorId)
         throw new Error('Trip not found or unauthorized');
+    // Delete route stop boxes first
+    const stopIds = trip.stops.map(s => s.id);
+    if (stopIds.length > 0) {
+        await prisma_1.prisma.routeStopBox.deleteMany({
+            where: { stopId: { in: stopIds } }
+        });
+    }
+    // Delete route stops
+    await prisma_1.prisma.routeStop.deleteMany({
+        where: { tripId }
+    });
+    // Delete settlements
+    await prisma_1.prisma.settlement.deleteMany({
+        where: { tripId }
+    });
     return prisma_1.prisma.trip.delete({ where: { id: tripId } });
 };
 exports.deleteTrip = deleteTrip;
@@ -133,6 +148,9 @@ const updateTripStatus = async (tripId, driverId, status, transportFee) => {
     });
     if (!trip || trip.driverId !== driverId)
         throw new Error('Trip not found or unauthorized');
+    if (trip.isSettled) {
+        throw new Error('Cannot update status of a settled trip');
+    }
     const data = { status };
     if (status === 'COMPLETED') {
         // Automatically calculate total collected from all stops
