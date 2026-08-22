@@ -3,7 +3,14 @@ import { prisma } from '../config/prisma';
 
 export const getTrips = async (userId: string, role: string) => {
   const where = role === 'VENDOR' ? { vendorId: userId } : { driverId: userId };
-  return prisma.trip.findMany({ where, include: { stops: true, driver: true, vendor: true } });
+  return prisma.trip.findMany({ 
+    where, 
+    include: { 
+      stops: { include: { merchant: true } }, 
+      driver: true, 
+      vendor: true 
+    } 
+  });
 };
 
 export const createTrip = async (vendorId: string, data: any) => {
@@ -120,8 +127,27 @@ export const updateTrip = async (tripId: string, vendorId: string, data: any) =>
 };
 
 export const deleteTrip = async (tripId: string, vendorId: string) => {
-  const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+  const trip = await prisma.trip.findUnique({ where: { id: tripId }, include: { stops: true } });
   if (!trip || trip.vendorId !== vendorId) throw new Error('Trip not found or unauthorized');
+  
+  // Delete route stop boxes first
+  const stopIds = trip.stops.map(s => s.id);
+  if (stopIds.length > 0) {
+    await prisma.routeStopBox.deleteMany({
+      where: { stopId: { in: stopIds } }
+    });
+  }
+
+  // Delete route stops
+  await prisma.routeStop.deleteMany({
+    where: { tripId }
+  });
+
+  // Delete settlements
+  await prisma.settlement.deleteMany({
+    where: { tripId }
+  });
+
   return prisma.trip.delete({ where: { id: tripId } });
 };
 
