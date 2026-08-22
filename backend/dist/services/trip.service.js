@@ -4,7 +4,14 @@ exports.updateTripStatus = exports.deleteTrip = exports.updateTrip = exports.get
 const prisma_1 = require("../config/prisma");
 const getTrips = async (userId, role) => {
     const where = role === 'VENDOR' ? { vendorId: userId } : { driverId: userId };
-    return prisma_1.prisma.trip.findMany({ where, include: { stops: true, driver: true, vendor: true } });
+    return prisma_1.prisma.trip.findMany({
+        where,
+        include: {
+            stops: { include: { merchant: true } },
+            driver: true,
+            vendor: true
+        }
+    });
 };
 exports.getTrips = getTrips;
 const createTrip = async (vendorId, data) => {
