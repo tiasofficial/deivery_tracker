@@ -91,6 +91,16 @@ export default function DriverDashboard() {
           </View>
         </View>
 
+        <Button
+          mode="contained"
+          icon="truck-fast"
+          style={styles.requestBtn}
+          buttonColor={colors.secondary}
+          onPress={() => router.push('/driver/request-pickup')}
+        >
+          REQUEST AD-HOC PICKUP
+        </Button>
+
         <Text style={styles.sectionTitle}>Assigned Trips</Text>
         
         {loading ? (
@@ -153,5 +163,6 @@ const styles = StyleSheet.create({
   routeText: { color: colors.textSecondary, marginLeft: 8 },
   actionBtn: { backgroundColor: colors.primary, borderRadius: 8 },
   emptyContainer: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { color: colors.textSecondary, marginTop: 12, fontSize: 15, textAlign: 'center' }
+  emptyText: { color: colors.textSecondary, marginTop: 12, fontSize: 15, textAlign: 'center' },
+  requestBtn: { marginBottom: 24, borderRadius: 8 }
 });

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { TextInput, Button, IconButton } from 'react-native-paper';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { api } from '@/services/api';
 
@@ -21,10 +21,11 @@ interface StopItem {
 
 export default function CreateTrip() {
   const router = useRouter();
+  const params = useLocalSearchParams();
   
   // Form State
   const [drivers, setDrivers] = useState<any[]>([]);
-  const [selectedDriverId, setSelectedDriverId] = useState('');
+  const [selectedDriverId, setSelectedDriverId] = useState(params.driverId as string || '');
   const [tripDate, setTripDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [notes, setNotes] = useState('');
@@ -33,7 +34,7 @@ export default function CreateTrip() {
   const [stops, setStops] = useState<StopItem[]>([
     {
       merchantName: '',
-      boxes: [{ boxType: 'Bata Box', quantity: '1' }]
+      boxes: [{ boxType: 'Bata Box', quantity: (params.adHocBoxes as string) || '1' }]
     }
   ]);
 
@@ -47,7 +48,7 @@ export default function CreateTrip() {
         if (driversRes.data.success && driversRes.data.data) {
           const list = driversRes.data.data;
           setDrivers(list);
-          if (list.length > 0) {
+          if (list.length > 0 && !selectedDriverId) {
             setSelectedDriverId(list[0].id);
           }
         }

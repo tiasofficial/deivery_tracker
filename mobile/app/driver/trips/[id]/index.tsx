@@ -56,23 +56,10 @@ export default function TripOverview() {
 
   // Complete Trip Handler
   const handleCompleteTrip = async () => {
-    if (!transportFee.trim()) {
-      Alert.alert('Required', 'Please enter the transport fee to complete the trip.');
-      return;
-    }
-
-    const fee = parseFloat(transportFee);
-    if (isNaN(fee) || fee < 0) {
-      Alert.alert('Invalid Input', 'Please enter a valid transport fee.');
-      return;
-    }
-
     setActionLoading(true);
     try {
-      await api.patch(`/trips/${tripId}/complete`, {
-        transportFee: fee
-      });
-      Alert.alert('Success', 'Trip successfully completed and transport fee submitted!');
+      await api.patch(`/trips/${tripId}/complete`);
+      Alert.alert('Success', 'Trip successfully completed!');
       fetchTripDetails();
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || 'Failed to complete trip');
@@ -134,19 +121,10 @@ export default function TripOverview() {
             </Button>
           )}
 
-          {/* DRIVER COMPLETES TRIP AND ENTERS TRANSPORT FEE */}
+          {/* DRIVER COMPLETES TRIP */}
           {trip.status !== 'COMPLETED' && trip.status !== 'SETTLED' && allStopsProcessed && (
             <View style={styles.completionContainer}>
               <Text style={styles.completeHeader}>Complete Delivery Route</Text>
-              <TextInput
-                label="Transport Fee (₹) *"
-                value={transportFee}
-                onChangeText={setTransportFee}
-                mode="outlined"
-                keyboardType="numeric"
-                style={styles.feeInput}
-                placeholder="Enter final transport charge"
-              />
               <Button 
                 mode="contained" 
                 style={styles.completeBtn}
@@ -167,7 +145,7 @@ export default function TripOverview() {
                 <Text style={[styles.feeValue, { color: colors.success }]}>₹{trip.totalCollected || 0}</Text>
               </View>
               <View style={styles.feeLabelRow}>
-                <Text style={styles.feeLabel}>Transport Fee charged by you:</Text>
+                <Text style={styles.feeLabel}>Transport Fee:</Text>
                 <Text style={styles.feeValue}>₹{trip.transportFee}</Text>
               </View>
               <View style={styles.feeLabelRow}>

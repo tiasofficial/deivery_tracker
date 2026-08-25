@@ -144,6 +144,17 @@ export default function VendorDashboard() {
                 Manage Drivers
               </Button>
             </View>
+
+            <Button 
+              mode="contained" 
+              buttonColor={colors.secondary}
+              onPress={() => router.push('/vendor/pickup-requests')}
+              style={[styles.actionBtn, { marginTop: 16 }]}
+              contentStyle={styles.btnContent}
+              icon="inbox"
+            >
+              Ad-Hoc Pickup Requests
+            </Button>
           </>
         )}
       </ScrollView>
