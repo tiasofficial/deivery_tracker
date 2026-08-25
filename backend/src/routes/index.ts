@@ -7,6 +7,7 @@ import boxtypeRoutes from './boxtype.routes';
 import analyticsRoutes from './analytics.routes';
 import settlementRoutes from './settlement.routes';
 import testRoutes from './test.routes';
+import pickupRequestRoutes from './pickupRequest.routes';
 
 const router = Router();
 router.use('/test-body', testRoutes);
@@ -16,7 +17,9 @@ router.use('/trips', tripRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/merchants', merchantRoutes);
 router.use('/boxtypes', boxtypeRoutes);
+
 router.use('/analytics', analyticsRoutes);
 router.use('/settlements', settlementRoutes);
+router.use('/pickup-requests', pickupRequestRoutes);
 
 export default router;

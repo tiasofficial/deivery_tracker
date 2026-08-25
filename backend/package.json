@@ -5,7 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "nodemon",
-    "build": "echo Using pre-compiled dist && prisma generate",
+    "build": "npx prisma db push --accept-data-loss && prisma generate",
     "start": "node dist/server.js",
     "db:migrate": "prisma migrate dev",
     "db:generate": "prisma generate",

@@ -42,9 +42,11 @@ model User {
   drivers       User[]       @relation("VendorDrivers")
   tripsAsDriver Trip[]       @relation("DriverTrips")
   tripsAsVendor Trip[]       @relation("VendorTrips")
-  settlements   Settlement[]
-  merchants     Merchant[]
-  boxTypes      BoxType[]
+  settlements          Settlement[]
+  merchants            Merchant[]
+  boxTypes             BoxType[]
+  pickupRequestsDriver PickupRequest[] @relation("DriverRequests")
+  pickupRequestsVendor PickupRequest[] @relation("VendorRequests")
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 }
@@ -128,3 +130,15 @@ model Settlement {
   settledAt  DateTime @default(now())
   notes      String?
 }
+
+model PickupRequest {
+  id          String   @id @default(uuid())
+  driverId    String
+  driver      User     @relation("DriverRequests", fields: [driverId], references: [id])
+  vendorId    String
+  vendor      User     @relation("VendorRequests", fields: [vendorId], references: [id])
+  boxCount    Int
+  status      String   @default("PENDING")
+  createdAt   DateTime @default(now())
+}
+
