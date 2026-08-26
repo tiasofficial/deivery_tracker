@@ -81,12 +81,13 @@ export default function VendorTripDetail() {
     }
   };
 
-  // Settle Trip Handler — now settles the NET amount (collected - fee)
+  // Settle Trip Handler — settles the collected amount directly (no subtraction)
   const handleSettleTrip = async () => {
-    const netAmount = Number(trip.totalCollected || 0) - Number(trip.transportFee || 0);
+    const collected = Number(trip.totalCollected || 0);
+    const fee = Number(trip.transportFee || 0);
     Alert.alert(
       'Confirm Settlement',
-      `Settle net amount of ${formatCurrency(netAmount)} with driver ${trip.driver?.name}?\n\n(Collected: ${formatCurrency(Number(trip.totalCollected || 0))} − Fee: ${formatCurrency(Number(trip.transportFee || 0))})`,
+      `Settle this trip with driver ${trip.driver?.name}?\n\nCollected Amount: ${formatCurrency(collected)}\nTransport Fee: ${formatCurrency(fee)}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -96,7 +97,7 @@ export default function VendorTripDetail() {
             try {
               await api.post('/settlements', {
                 tripId: trip.id,
-                amount: netAmount,
+                amount: collected,
                 notes: 'Settled from trip details screen'
               });
               Alert.alert('Success', 'Trip cash balance settled successfully!');
@@ -128,7 +129,6 @@ export default function VendorTripDetail() {
     );
   }
 
-  const netAmount = Number(trip.totalCollected || 0) - Number(trip.transportFee || 0);
   const canEdit = trip.status === 'COMPLETED' && !trip.isSettled;
 
   return (
@@ -198,13 +198,6 @@ export default function VendorTripDetail() {
                   keyboardType="numeric"
                   style={styles.editInput}
                 />
-                {/* Live preview of net amount while editing */}
-                <View style={styles.previewRow}>
-                  <Text style={styles.previewLabel}>Net Amount Preview:</Text>
-                  <Text style={styles.previewValue}>
-                    {formatCurrency(Math.max(0, parseFloat(editCollected || '0') - parseFloat(editFee || '0')))}
-                  </Text>
-                </View>
                 <View style={styles.editBtnRow}>
                   <Button
                     mode="contained"
@@ -229,11 +222,6 @@ export default function VendorTripDetail() {
             ) : (
               <>
                 <View style={styles.row}>
-                  <Text style={styles.label}>Transport Fee:</Text>
-                  <Text style={styles.value}>{formatCurrency(Number(trip.transportFee || 0))}</Text>
-                </View>
-
-                <View style={styles.row}>
                   <Text style={styles.label}>Total Collected:</Text>
                   <Text style={[styles.value, { color: colors.success, fontSize: 18 }]}>
                     {formatCurrency(Number(trip.totalCollected || 0))}
@@ -241,9 +229,9 @@ export default function VendorTripDetail() {
                 </View>
 
                 <View style={styles.row}>
-                  <Text style={styles.label}>Final Amount (Net):</Text>
-                  <Text style={[styles.value, { color: colors.secondary, fontSize: 18, fontWeight: 'bold' }]}>
-                    {formatCurrency(netAmount)}
+                  <Text style={styles.label}>Transport Fee:</Text>
+                  <Text style={[styles.value, { color: colors.secondary, fontSize: 16 }]}>
+                    {formatCurrency(Number(trip.transportFee || 0))}
                   </Text>
                 </View>
 
@@ -269,7 +257,7 @@ export default function VendorTripDetail() {
                     loading={settleLoading}
                     disabled={settleLoading}
                   >
-                    SETTLE NET AMOUNT ({formatCurrency(netAmount)})
+                    SETTLE TRIP ({formatCurrency(Number(trip.totalCollected || 0))})
                   </Button>
                 )}
               </>

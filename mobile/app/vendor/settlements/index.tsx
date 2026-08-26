@@ -1,23 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
-import { Button } from 'react-native-paper';
+import { Button, IconButton } from 'react-native-paper';
 import { api } from '@/services/api';
 import { formatCurrency } from '@/utils/formatCurrency';
-import { useNavigation } from 'expo-router';
+import { useNavigation, useRouter } from 'expo-router';
 
 interface DriverSettlementGroup {
   driverId: string;
   driverName: string;
   tripsCount: number;
-  totalAmount: number;
+  totalCollected: number;
+  totalTransportFee: number;
   unsettledTrips: any[];
 }
 
 export default function SettlementsList() {
   const navigation = useNavigation();
+  const router = useRouter();
   const [unsettledGroups, setUnsettledGroups] = useState<DriverSettlementGroup[]>([]);
+  const [expandedDriverId, setExpandedDriverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [settlingId, setSettlingId] = useState<string | null>(null);
@@ -27,9 +30,9 @@ export default function SettlementsList() {
       const res = await api.get('/trips');
       const allTrips = res.data.data || [];
       
-      // Filter: Trip must be completed, have collected amount, and not yet settled
+      // Filter: Trip must be completed, have collected amount or transport fee, and not yet settled
       const outstandingTrips = allTrips.filter((trip: any) => 
-        (trip.status === 'COMPLETED' || trip.totalCollected > 0) && !trip.isSettled
+        (trip.status === 'COMPLETED' || parseFloat(trip.totalCollected || '0') > 0) && !trip.isSettled
       );
 
       // Group outstanding trips by driver
@@ -39,19 +42,22 @@ export default function SettlementsList() {
         const driverId = trip.driverId;
         const driverName = trip.driver?.name || 'Unknown Driver';
         const collectedVal = parseFloat(trip.totalCollected || '0');
+        const feeVal = parseFloat(trip.transportFee || '0');
 
         if (!groupsMap[driverId]) {
           groupsMap[driverId] = {
             driverId,
             driverName,
             tripsCount: 0,
-            totalAmount: 0,
+            totalCollected: 0,
+            totalTransportFee: 0,
             unsettledTrips: []
           };
         }
         
         groupsMap[driverId].tripsCount += 1;
-        groupsMap[driverId].totalAmount += collectedVal;
+        groupsMap[driverId].totalCollected += collectedVal;
+        groupsMap[driverId].totalTransportFee += feeVal;
         groupsMap[driverId].unsettledTrips.push(trip);
       });
 
@@ -77,11 +83,47 @@ export default function SettlementsList() {
     fetchUnsettledTrips();
   };
 
-  // Perform Settlement
-  const handleSettle = async (group: DriverSettlementGroup) => {
+  const toggleExpand = (driverId: string) => {
+    setExpandedDriverId(prev => (prev === driverId ? null : driverId));
+  };
+
+  // Perform Settlement for a single trip
+  const handleSettleSingleTrip = async (trip: any, driverName: string) => {
+    const collected = parseFloat(trip.totalCollected || '0');
+    const fee = parseFloat(trip.transportFee || '0');
     Alert.alert(
       'Confirm Settlement',
-      `Are you sure you want to settle ${group.tripsCount} trips for ${group.driverName} totaling ${formatCurrency(group.totalAmount)}?`,
+      `Settle this trip for ${driverName}?\n\nCollected Amount: ${formatCurrency(collected)}\nTransport Fee: ${formatCurrency(fee)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Settle Trip',
+          onPress: async () => {
+            setSettlingId(trip.id);
+            try {
+              await api.post('/settlements', {
+                tripId: trip.id,
+                amount: collected,
+                notes: 'Settled single trip from settlements dashboard'
+              });
+              Alert.alert('Success', 'Trip settled successfully!');
+              fetchUnsettledTrips();
+            } catch (error: any) {
+              Alert.alert('Error', error?.response?.data?.message || 'Failed to settle trip.');
+            } finally {
+              setSettlingId(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  // Perform Settlement for all trips of a driver
+  const handleSettleAll = async (group: DriverSettlementGroup) => {
+    Alert.alert(
+      'Confirm Settle All',
+      `Are you sure you want to settle all ${group.tripsCount} trips for ${group.driverName}?\n\nTotal Collected: ${formatCurrency(group.totalCollected)}\nTotal Transport Fee: ${formatCurrency(group.totalTransportFee)}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -89,7 +131,6 @@ export default function SettlementsList() {
           onPress: async () => {
             setSettlingId(group.driverId);
             try {
-              // Loop and settle each outstanding trip
               for (const trip of group.unsettledTrips) {
                 await api.post('/settlements', {
                   tripId: trip.id,
@@ -97,7 +138,7 @@ export default function SettlementsList() {
                   notes: 'Settle cash collection from dashboard'
                 });
               }
-              Alert.alert('Success', `All cash collections settled for ${group.driverName}!`);
+              Alert.alert('Success', `All trips settled for ${group.driverName}!`);
               fetchUnsettledTrips();
             } catch (error: any) {
               Alert.alert('Error', error?.response?.data?.message || 'Failed to complete settlement.');
@@ -128,24 +169,119 @@ export default function SettlementsList() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />
           }
-          renderItem={({ item }) => (
-            <View style={styles.card}>
-              <View style={styles.infoCol}>
-                <Text style={styles.driver}>{item.driverName}</Text>
-                <Text style={styles.tripsText}>{item.tripsCount} Outstanding Trip{item.tripsCount > 1 ? 's' : ''}</Text>
-                <Text style={styles.amount}>{formatCurrency(item.totalAmount)}</Text>
+          renderItem={({ item }) => {
+            const isExpanded = expandedDriverId === item.driverId;
+            return (
+              <View style={styles.card}>
+                {/* Click driver row to expand/collapse trips */}
+                <TouchableOpacity 
+                  style={styles.cardHeader} 
+                  onPress={() => toggleExpand(item.driverId)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.driverInfo}>
+                    <Text style={styles.driver}>{item.driverName}</Text>
+                    <Text style={styles.tripsCountBadge}>
+                      {item.tripsCount} Unsettled Trip{item.tripsCount > 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  <IconButton 
+                    icon={isExpanded ? "chevron-up" : "chevron-down"} 
+                    iconColor={colors.primary} 
+                    size={24}
+                    style={{ margin: 0 }}
+                  />
+                </TouchableOpacity>
+
+                {/* Driver Totals Row */}
+                <View style={styles.totalsRow}>
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Total Collected</Text>
+                    <Text style={[styles.metricValue, { color: colors.success }]}>
+                      {formatCurrency(item.totalCollected)}
+                    </Text>
+                  </View>
+                  <View style={styles.metricDivider} />
+                  <View style={styles.metricBox}>
+                    <Text style={styles.metricLabel}>Transport Fee</Text>
+                    <Text style={[styles.metricValue, { color: colors.secondary }]}>
+                      {formatCurrency(item.totalTransportFee)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Settle All Button */}
+                <Button 
+                  mode="contained" 
+                  onPress={() => handleSettleAll(item)}
+                  loading={settlingId === item.driverId}
+                  disabled={settlingId !== null}
+                  style={styles.settleAllBtn}
+                  icon="check-all"
+                >
+                  Settle All Trips ({item.tripsCount})
+                </Button>
+
+                {/* Expanded Trips Breakdown */}
+                {isExpanded && (
+                  <View style={styles.expandedContainer}>
+                    <Text style={styles.breakdownTitle}>Trips Breakdown (Click to View/Edit):</Text>
+                    {item.unsettledTrips.map((trip: any, idx: number) => {
+                      const tripCollected = parseFloat(trip.totalCollected || '0');
+                      const tripFee = parseFloat(trip.transportFee || '0');
+                      const tripDateStr = new Date(trip.tripDate).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      });
+
+                      return (
+                        <View key={trip.id} style={styles.tripItemCard}>
+                          <TouchableOpacity 
+                            style={styles.tripItemHeader}
+                            onPress={() => router.push({ pathname: '/vendor/trips/[id]', params: { id: trip.id } })}
+                          >
+                            <View>
+                              <Text style={styles.tripDateText}>#{idx + 1} • {tripDateStr}</Text>
+                              <Text style={styles.tripStopsText}>{trip.stops?.length || 0} Stops</Text>
+                            </View>
+                            <Text style={styles.viewEditLink}>View/Edit →</Text>
+                          </TouchableOpacity>
+
+                          <View style={styles.tripItemAmounts}>
+                            <View style={styles.amountCol}>
+                              <Text style={styles.amountColLabel}>Collected:</Text>
+                              <Text style={[styles.amountColVal, { color: colors.success }]}>
+                                {formatCurrency(tripCollected)}
+                              </Text>
+                            </View>
+                            <View style={styles.amountCol}>
+                              <Text style={styles.amountColLabel}>Transport Fee:</Text>
+                              <Text style={[styles.amountColVal, { color: colors.secondary }]}>
+                                {formatCurrency(tripFee)}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Button
+                            mode="outlined"
+                            onPress={() => handleSettleSingleTrip(trip, item.driverName)}
+                            loading={settlingId === trip.id}
+                            disabled={settlingId !== null}
+                            style={styles.settleSingleBtn}
+                            textColor={colors.primary}
+                            compact
+                          >
+                            Settle This Trip
+                          </Button>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
               </View>
-              <Button 
-                mode="contained" 
-                onPress={() => handleSettle(item)}
-                loading={settlingId === item.driverId}
-                disabled={settlingId !== null}
-                style={styles.settleBtn}
-              >
-                Settle
-              </Button>
-            </View>
-          )}
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Text style={styles.empty}>All driver cash collections are fully settled! 🎉</Text>
@@ -163,12 +299,35 @@ const styles = StyleSheet.create({
   title: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
   list: { padding: 16 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-  infoCol: { flex: 1, marginRight: 16 },
-  driver: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 4 },
-  tripsText: { color: colors.textSecondary, marginBottom: 8, fontSize: 13 },
-  amount: { fontSize: 17, fontWeight: 'bold', color: colors.warning },
-  settleBtn: { backgroundColor: colors.primary, borderRadius: 8 },
+  card: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  driverInfo: { flex: 1 },
+  driver: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
+  tripsCountBadge: { color: colors.textSecondary, fontSize: 13, marginTop: 2 },
+  
+  totalsRow: { flexDirection: 'row', justifyContent: 'space-between', backgroundColor: colors.surfaceAlt, borderRadius: 8, padding: 12, marginVertical: 12, alignItems: 'center' },
+  metricBox: { flex: 1, alignItems: 'center' },
+  metricLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
+  metricValue: { fontSize: 16, fontWeight: 'bold' },
+  metricDivider: { width: 1, height: '80%', backgroundColor: colors.border },
+
+  settleAllBtn: { backgroundColor: colors.primary, borderRadius: 8, marginTop: 4 },
+  
+  expandedContainer: { marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
+  breakdownTitle: { fontSize: 13, fontWeight: 'bold', color: colors.textSecondary, marginBottom: 10 },
+  tripItemCard: { backgroundColor: colors.surfaceAlt, borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
+  tripItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  tripDateText: { color: colors.textPrimary, fontWeight: 'bold', fontSize: 14 },
+  tripStopsText: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
+  viewEditLink: { color: colors.primary, fontSize: 12, fontWeight: 'bold' },
+  
+  tripItemAmounts: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 6, paddingVertical: 6, borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.border + '55' },
+  amountCol: { flex: 1 },
+  amountColLabel: { color: colors.textSecondary, fontSize: 11 },
+  amountColVal: { fontWeight: 'bold', fontSize: 14, marginTop: 2 },
+  
+  settleSingleBtn: { borderColor: colors.primary, marginTop: 6, borderRadius: 6 },
+
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   empty: { color: colors.textSecondary, textAlign: 'center', fontSize: 16, paddingHorizontal: 24 }
 });
