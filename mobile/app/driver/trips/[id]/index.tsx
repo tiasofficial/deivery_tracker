@@ -137,7 +137,7 @@ export default function TripOverview() {
             </View>
           )}
 
-          {/* DISPLAY TRANSPORT FEE AND NET REMIT IF COMPLETED */}
+          {/* DISPLAY TRANSPORT FEE AND COLLECTED AMOUNT IF COMPLETED */}
           {(trip.status === 'COMPLETED' || trip.status === 'SETTLED') && (
             <>
               <View style={styles.feeLabelRow}>
@@ -146,13 +146,7 @@ export default function TripOverview() {
               </View>
               <View style={styles.feeLabelRow}>
                 <Text style={styles.feeLabel}>Transport Fee:</Text>
-                <Text style={styles.feeValue}>₹{trip.transportFee}</Text>
-              </View>
-              <View style={styles.feeLabelRow}>
-                <Text style={styles.feeLabel}>Final Amount to Remit (Net):</Text>
-                <Text style={[styles.feeValue, { color: colors.secondary, fontSize: 16, fontWeight: 'bold' }]}>
-                  ₹{Number(trip.totalCollected || 0) - Number(trip.transportFee || 0)}
-                </Text>
+                <Text style={[styles.feeValue, { color: colors.secondary }]}>₹{trip.transportFee || 0}</Text>
               </View>
             </>
           )}

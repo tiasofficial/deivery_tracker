@@ -181,7 +181,7 @@ export default function VendorTripDetail() {
             {/* EDIT MODE — show editable inputs */}
             {editMode ? (
               <View style={styles.editContainer}>
-                <Text style={styles.editTitle}>✏️ Edit Before Settling</Text>
+                <Text style={styles.editTitle}>✏️ Edit Amounts</Text>
                 <TextInput
                   label="Total Collected (₹)"
                   value={editCollected}
@@ -235,6 +235,13 @@ export default function VendorTripDetail() {
                   </Text>
                 </View>
 
+                {/* Quick Notice if completed and fee is 0 */}
+                {trip.status === 'COMPLETED' && !trip.isSettled && Number(trip.transportFee || 0) === 0 && (
+                  <View style={styles.feePromptBox}>
+                    <Text style={styles.feePromptText}>💡 Driver completed drive. Tap below to set the transport fee for this trip.</Text>
+                  </View>
+                )}
+
                 {/* Edit button — only for unsettled completed trips */}
                 {canEdit && (
                   <Button
@@ -244,7 +251,7 @@ export default function VendorTripDetail() {
                     textColor={colors.warning}
                     icon="pencil"
                   >
-                    Edit Amounts Before Settling
+                    {Number(trip.transportFee || 0) === 0 ? 'Set Transport Fee' : 'Edit Transport Fee / Amounts'}
                   </Button>
                 )}
 
@@ -336,6 +343,8 @@ const styles = StyleSheet.create({
   editBtn: { flex: 1, borderRadius: 8 },
   editBeforeSettleBtn: { borderColor: colors.warning, borderWidth: 1, borderRadius: 8, marginTop: 4, marginBottom: 8 },
 
+  feePromptBox: { backgroundColor: colors.warning + '18', borderColor: colors.warning, borderWidth: 1, borderRadius: 8, padding: 10, marginVertical: 8 },
+  feePromptText: { color: colors.warning, fontSize: 13, fontWeight: '500' },
   settleBtn: { backgroundColor: colors.secondary, borderRadius: 8, marginTop: 8 },
   settledBadge: { backgroundColor: colors.success + '22', borderRadius: 8, padding: 12, marginTop: 16, alignItems: 'center', borderWidth: 1, borderColor: colors.success },
   settledBadgeText: { color: colors.success, fontWeight: 'bold', fontSize: 13 },

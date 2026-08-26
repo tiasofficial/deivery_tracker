@@ -16,6 +16,18 @@ interface DriverSettlementGroup {
   unsettledTrips: any[];
 }
 
+function getRelativeDays(dateStr: string) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
 export default function SettlementsList() {
   const navigation = useNavigation();
   const router = useRouter();
@@ -242,7 +254,12 @@ export default function SettlementsList() {
                             onPress={() => router.push({ pathname: '/vendor/trips/[id]', params: { id: trip.id } })}
                           >
                             <View>
-                              <Text style={styles.tripDateText}>#{idx + 1} • {tripDateStr}</Text>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Text style={styles.tripDateText}>#{idx + 1} • {tripDateStr}</Text>
+                                <View style={styles.ageBadge}>
+                                  <Text style={styles.ageBadgeText}>{getRelativeDays(trip.tripDate)}</Text>
+                                </View>
+                              </View>
                               <Text style={styles.tripStopsText}>{trip.stops?.length || 0} Stops</Text>
                             </View>
                             <Text style={styles.viewEditLink}>View/Edit →</Text>
@@ -318,6 +335,8 @@ const styles = StyleSheet.create({
   tripItemCard: { backgroundColor: colors.surfaceAlt, borderRadius: 8, padding: 12, marginBottom: 10, borderWidth: 1, borderColor: colors.border },
   tripItemHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   tripDateText: { color: colors.textPrimary, fontWeight: 'bold', fontSize: 14 },
+  ageBadge: { backgroundColor: colors.primary + '22', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 },
+  ageBadgeText: { color: colors.primary, fontSize: 10, fontWeight: 'bold' },
   tripStopsText: { color: colors.textSecondary, fontSize: 12, marginTop: 2 },
   viewEditLink: { color: colors.primary, fontSize: 12, fontWeight: 'bold' },
   
