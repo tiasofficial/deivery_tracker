@@ -29,7 +29,7 @@ const register = async (data) => {
         data: { name, email, phone, password: hashedPassword, role, vehicleNo, vendorId },
     });
     const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
-    return { user: { id: user.id, name, email, role }, token };
+    return { user: { id: user.id, name, email, role, vendorId: user.vendorId }, token };
 };
 exports.register = register;
 const login = async (data) => {
@@ -46,7 +46,7 @@ const login = async (data) => {
     if (!isValid)
         throw new Error('Invalid credentials');
     const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
-    return { user: { id: user.id, name: user.name, email, role: user.role }, token };
+    return { user: { id: user.id, name: user.name, email, role: user.role, vendorId: user.vendorId }, token };
 };
 exports.login = login;
 const getMe = async (userId) => {

@@ -148,7 +148,7 @@ export default function VendorDashboard() {
             <Button 
               mode="contained" 
               buttonColor={colors.secondary}
-              onPress={() => router.push('/vendor/pickup-requests')}
+              onPress={() => router.push('/vendor/pickup-requests' as any)}
               style={[styles.actionBtn, { marginTop: 16 }]}
               contentStyle={styles.btnContent}
               icon="inbox"

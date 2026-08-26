@@ -5,9 +5,21 @@ const prisma_1 = require("../config/prisma");
 const response_1 = require("../utils/response");
 const createPickupRequest = async (req, res) => {
     try {
-        const { boxCount, vendorId } = req.body;
-        if (!boxCount || !vendorId) {
-            return (0, response_1.sendError)(res, 'boxCount and vendorId are required', 400);
+        const { boxCount } = req.body;
+        let vendorId = req.body.vendorId;
+        if (!boxCount || isNaN(Number(boxCount)) || Number(boxCount) <= 0) {
+            return (0, response_1.sendError)(res, 'Valid boxCount is required', 400);
+        }
+        if (!vendorId) {
+            const driver = await prisma_1.prisma.user.findUnique({ where: { id: req.user.id } });
+            vendorId = driver?.vendorId;
+        }
+        if (!vendorId) {
+            const defaultVendor = await prisma_1.prisma.user.findFirst({ where: { role: 'VENDOR' } });
+            vendorId = defaultVendor?.id;
+        }
+        if (!vendorId) {
+            return (0, response_1.sendError)(res, 'No associated vendor found for this driver', 400);
         }
         const request = await prisma_1.prisma.pickupRequest.create({
             data: {

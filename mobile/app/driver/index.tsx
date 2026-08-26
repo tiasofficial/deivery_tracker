@@ -96,7 +96,7 @@ export default function DriverDashboard() {
           icon="truck-fast"
           style={styles.requestBtn}
           buttonColor={colors.secondary}
-          onPress={() => router.push('/driver/request-pickup')}
+          onPress={() => router.push('/driver/request-pickup' as any)}
         >
           REQUEST AD-HOC PICKUP
         </Button>

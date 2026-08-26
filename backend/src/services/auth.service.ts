@@ -26,7 +26,7 @@ export const register = async (data: any) => {
   });
 
   const token = generateToken({ id: user.id, role: user.role });
-  return { user: { id: user.id, name, email, role }, token };
+  return { user: { id: user.id, name, email, role, vendorId: user.vendorId }, token };
 };
 
 export const login = async (data: any) => {
@@ -45,7 +45,7 @@ export const login = async (data: any) => {
   if (!isValid) throw new Error('Invalid credentials');
 
   const token = generateToken({ id: user.id, role: user.role });
-  return { user: { id: user.id, name: user.name, email, role: user.role }, token };
+  return { user: { id: user.id, name: user.name, email, role: user.role, vendorId: user.vendorId }, token };
 };
 
 export const getMe = async (userId: string) => {

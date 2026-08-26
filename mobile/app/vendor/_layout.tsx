@@ -17,6 +17,7 @@ export default function VendorLayout() {
       <Tabs.Screen name="settlements/index" options={{ title: 'Settlements', tabBarIcon: ({color}) => <Ionicons name="cash" size={24} color={color} /> }} />
 
       {/* Hidden Sub-pages */}
+      <Tabs.Screen name="pickup-requests" options={{ href: null }} />
       <Tabs.Screen name="trips/create" options={{ href: null }} />
       <Tabs.Screen name="trips/[id]" options={{ href: null }} />
       <Tabs.Screen name="drivers/index" options={{ href: null }} />

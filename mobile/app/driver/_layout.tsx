@@ -14,6 +14,7 @@ export default function DriverLayout() {
       <Tabs.Screen name="history/index" options={{ title: 'History', tabBarIcon: ({color}) => <Ionicons name="time" size={24} color={color} /> }} />
       
       {/* Hide internal sub-screens from tab navigator */}
+      <Tabs.Screen name="request-pickup" options={{ href: null }} />
       <Tabs.Screen name="trips/index" options={{ href: null }} />
       <Tabs.Screen name="trips/[id]/index" options={{ href: null }} />
       <Tabs.Screen name="trips/[id]/stop/[stopId]" options={{ href: null }} />
