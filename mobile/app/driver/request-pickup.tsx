@@ -44,7 +44,7 @@ export default function RequestPickup() {
         <Text style={styles.title}>Request Ad-hoc Pickup</Text>
       </View>
       <View style={styles.content}>
-        <Text style={styles.info>
+        <Text style={styles.info}>
           Use this to notify the vendor that you are picking up extra parcels. The vendor can then approve this and create a formal trip.
         </Text>
         

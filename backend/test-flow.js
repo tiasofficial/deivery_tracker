@@ -4,21 +4,21 @@ const prisma = new PrismaClient();
 
 async function fullFlow() {
   try {
-    const loginRes = await fetch('http://localhost:4000/api/auth/login', {
+    const loginRes = await fetch('https://deivery-tracker.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'vendor@test.com', password: 'password123' })
     });
     const { data: { token: vendorToken, user: vendor } } = await loginRes.json();
 
-    const driverLoginRes = await fetch('http://localhost:4000/api/auth/login', {
+    const driverLoginRes = await fetch('https://deivery-tracker.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'driver1@test.com', password: 'password123' })
     });
     const { data: { token: driverToken, user: driver } } = await driverLoginRes.json();
 
-    const createRes = await fetch('http://localhost:4000/api/trips', {
+    const createRes = await fetch('https://deivery-tracker.onrender.com/api/trips', {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',
@@ -35,13 +35,13 @@ async function fullFlow() {
     const { data: newTrip } = await createRes.json();
     console.log('Created trip:', newTrip.id);
 
-    await fetch(`http://localhost:4000/api/trips/${newTrip.id}/start`, {
+    await fetch(`https://deivery-tracker.onrender.com/api/trips/${newTrip.id}/start`, {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${driverToken}` }
     });
 
     const stopId = newTrip.stops[0].id;
-    await fetch(`http://localhost:4000/api/trips/${newTrip.id}/stops/${stopId}/collect`, {
+    await fetch(`https://deivery-tracker.onrender.com/api/trips/${newTrip.id}/stops/${stopId}/collect`, {
       method: 'POST',
       headers: { 
         'Content-Type': 'application/json',

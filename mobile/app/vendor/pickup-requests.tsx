@@ -77,11 +77,11 @@ export default function PickupRequests() {
             <Text style={styles.date}>{new Date(item.createdAt).toLocaleString()}</Text>
 
             {item.status === 'PENDING' && (
-              <Button 
-                mode="contained" 
-                style={styles.approveBtn}
-                onPress=y() => handleApprove(item.id, item.boxCount, item.driverId)}
-              >
+              <Button
+               mode="contained"
+               style={styles.approveBtn}
+               onPress={() => handleApprove(item.id, item.boxCount, item.driverId)}
+               >
                 Create Trip for this Request
               </Button>
             )}
