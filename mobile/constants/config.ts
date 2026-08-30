@@ -1,2 +1,2 @@
-export const API_URL = 'https://deivery-tracker.onrender.com/api';
+export const API_URL = 'https://deivery-tracker-s0js.onrender.com/api';
 

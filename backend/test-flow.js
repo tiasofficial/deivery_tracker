@@ -4,14 +4,14 @@ const prisma = new PrismaClient();
 
 async function fullFlow() {
   try {
-    const loginRes = await fetch('https://deivery-tracker.onrender.com/api/auth/login', {
+    const loginRes = await fetch('https://deivery-tracker-s0js.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'vendor@test.com', password: 'password123' })
     });
     const { data: { token: vendorToken, user: vendor } } = await loginRes.json();
 
-    const driverLoginRes = await fetch('https://deivery-tracker.onrender.com/api/auth/login', {
+    const driverLoginRes = await fetch('https://deivery-tracker-s0js.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'driver1@test.com', password: 'password123' })

@@ -1,6 +1,6 @@
 async function test() {
   try {
-    const loginRes = await fetch('https://deivery-tracker.onrender.com/api/auth/login', {
+    const loginRes = await fetch('https://deivery-tracker-s0js.onrender.com/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'driver1@test.com', password: 'password123' })
@@ -10,7 +10,7 @@ async function test() {
     console.log('Got token');
     
     // Get trips
-    const tripsRes = await fetch('https://deivery-tracker.onrender.com/api/trips', {
+    const tripsRes = await fetch('https://deivery-tracker-s0js.onrender.com/api/trips', {
       headers: { Authorization: `Bearer ${token}` }
     });
     const tripsData = await tripsRes.json();
