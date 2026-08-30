@@ -1,9 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { verifyToken } from '../utils/jwt';
-import { PrismaClient } from '@prisma/client';
 import { sendError } from '../utils/response';
-
-const prisma = new PrismaClient();
 
 export interface AuthRequest extends Request {
   user?: any;
@@ -19,18 +16,21 @@ export const authenticate = async (req: AuthRequest, res: Response, next: NextFu
     const token = authHeader.split(' ')[1];
     const decoded: any = verifyToken(token);
 
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
-      select: { id: true, email: true, role: true, vendorId: true },
-    });
-
-    if (!user) {
-      return sendError(res, 'Unauthorized - Invalid user', 401);
+    if (!decoded || !decoded.id) {
+      return sendError(res, 'Unauthorized - Invalid token payload', 401);
     }
 
-    req.user = user;
+    req.user = {
+      id: decoded.id,
+      email: decoded.email,
+      role: decoded.role,
+      vendorId: decoded.vendorId
+    };
+
     next();
-  } catch (error) {
+  } catch (error: any) {
+    console.error('Auth verification error:', error?.message);
     return sendError(res, 'Unauthorized - Invalid token', 401);
   }
 };
+

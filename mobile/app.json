@@ -34,7 +34,11 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
-    }
+      "router": {},
+      "eas": {
+        "projectId": "59beb423-7fba-431d-90a3-19a5defbd07d"
+      }
+    },
+    "owner": "arpitjainofficial"
   }
 }

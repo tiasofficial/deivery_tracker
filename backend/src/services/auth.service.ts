@@ -25,7 +25,7 @@ export const register = async (data: any) => {
     data: { name, email, phone, password: hashedPassword, role, vehicleNo, vendorId },
   });
 
-  const token = generateToken({ id: user.id, role: user.role });
+  const token = generateToken({ id: user.id, email: user.email, role: user.role, vendorId: user.vendorId });
   return { user: { id: user.id, name, email, role, vendorId: user.vendorId }, token };
 };
 
@@ -44,7 +44,7 @@ export const login = async (data: any) => {
   console.log('Password valid comparison result:', isValid);
   if (!isValid) throw new Error('Invalid credentials');
 
-  const token = generateToken({ id: user.id, role: user.role });
+  const token = generateToken({ id: user.id, email: user.email, role: user.role, vendorId: user.vendorId });
   return { user: { id: user.id, name: user.name, email, role: user.role, vendorId: user.vendorId }, token };
 };
 

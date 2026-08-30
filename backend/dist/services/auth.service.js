@@ -28,7 +28,7 @@ const register = async (data) => {
     const user = await prisma_1.prisma.user.create({
         data: { name, email, phone, password: hashedPassword, role, vehicleNo, vendorId },
     });
-    const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
+    const token = (0, jwt_1.generateToken)({ id: user.id, email: user.email, role: user.role, vendorId: user.vendorId });
     return { user: { id: user.id, name, email, role, vendorId: user.vendorId }, token };
 };
 exports.register = register;
@@ -45,7 +45,7 @@ const login = async (data) => {
     console.log('Password valid comparison result:', isValid);
     if (!isValid)
         throw new Error('Invalid credentials');
-    const token = (0, jwt_1.generateToken)({ id: user.id, role: user.role });
+    const token = (0, jwt_1.generateToken)({ id: user.id, email: user.email, role: user.role, vendorId: user.vendorId });
     return { user: { id: user.id, name: user.name, email, role: user.role, vendorId: user.vendorId }, token };
 };
 exports.login = login;
