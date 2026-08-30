@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, ActivityIndicator, TouchableOpacity, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
 import colors from '../../constants/colors';
 import { Button, IconButton } from 'react-native-paper';
 import { useRouter, useNavigation } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { api } from '@/services/api';
 import { formatCurrency } from '@/utils/formatCurrency';
 
@@ -21,17 +22,30 @@ export default function VendorDashboard() {
     activeDrivers: 0,
     unsettledBalance: 0
   });
+  const [pendingPickupCount, setPendingPickupCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchSummary = async () => {
+  const fetchDashboardData = async () => {
     try {
+      // 1. Fetch Analytics Summary
       const res = await api.get('/analytics/summary?period=today');
       if (res.data.success && res.data.data) {
         setMetrics(res.data.data);
       }
     } catch (error) {
       console.error('Failed to fetch summary metrics:', error);
+    }
+
+    try {
+      // 2. Fetch Pending Pickup Requests for live notification
+      const pickupRes = await api.get('/pickup-requests');
+      if (pickupRes.data.success && pickupRes.data.data) {
+        const pending = pickupRes.data.data.filter((r: any) => r.status === 'PENDING');
+        setPendingPickupCount(pending.length);
+      }
+    } catch (error) {
+      console.error('Failed to fetch pickup requests:', error);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -39,16 +53,25 @@ export default function VendorDashboard() {
   };
 
   useEffect(() => {
-    fetchSummary();
+    fetchDashboardData();
     const unsubscribe = navigation.addListener('focus', () => {
-      fetchSummary();
+      fetchDashboardData();
     });
-    return unsubscribe;
+
+    // Real-time polling every 8 seconds for incoming driver pickup requests
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 8000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [navigation]);
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchSummary();
+    fetchDashboardData();
   };
 
   const handleLogout = async () => {
@@ -69,12 +92,25 @@ export default function VendorDashboard() {
             <Text style={styles.greeting}>Hello, {user?.name || 'Vendor'}</Text>
             <Text style={styles.date}>{new Date().toDateString()}</Text>
           </View>
-          <IconButton 
-            icon="logout" 
-            iconColor={colors.error} 
-            size={24} 
-            onPress={handleLogout} 
-          />
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity 
+              style={styles.bellButton}
+              onPress={() => router.push('/vendor/pickup-requests' as any)}
+            >
+              <Ionicons name="notifications-outline" size={24} color={colors.textPrimary} />
+              {pendingPickupCount > 0 && (
+                <View style={styles.bellBadge}>
+                  <Text style={styles.bellBadgeText}>{pendingPickupCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <IconButton 
+              icon="logout" 
+              iconColor={colors.error} 
+              size={24} 
+              onPress={handleLogout} 
+            />
+          </View>
         </View>
 
         {loading ? (
@@ -83,6 +119,28 @@ export default function VendorDashboard() {
           </View>
         ) : (
           <>
+            {/* 🚨 LIVE NOTIFICATION BANNER FOR AD-HOC PICKUPS */}
+            {pendingPickupCount > 0 && (
+              <TouchableOpacity 
+                style={styles.notificationBanner}
+                onPress={() => router.push('/vendor/pickup-requests' as any)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.notificationIconBox}>
+                  <Ionicons name="alert-circle" size={26} color="#FFF" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.notificationTitle}>
+                    🔔 {pendingPickupCount} Ad-Hoc Pickup Request{pendingPickupCount > 1 ? 's' : ''}!
+                  </Text>
+                  <Text style={styles.notificationSub}>
+                    Driver has requested parcel pickups. Tap to approve and create trips.
+                  </Text>
+                </View>
+                <Ionicons name="chevron-forward" size={20} color={colors.warning} />
+              </TouchableOpacity>
+            )}
+
             {/* METRICS ROW 1 */}
             <View style={styles.statsContainer}>
               <TouchableOpacity 
@@ -147,13 +205,16 @@ export default function VendorDashboard() {
 
             <Button 
               mode="contained" 
-              buttonColor={colors.secondary}
+              buttonColor={pendingPickupCount > 0 ? colors.warning : colors.secondary}
+              textColor="#0F0F1A"
               onPress={() => router.push('/vendor/pickup-requests' as any)}
               style={[styles.actionBtn, { marginTop: 16 }]}
               contentStyle={styles.btnContent}
-              icon="inbox"
+              icon={pendingPickupCount > 0 ? "bell-ring" : "inbox"}
             >
-              Ad-Hoc Pickup Requests
+              {pendingPickupCount > 0 
+                ? `🚨 ${pendingPickupCount} PENDING PICKUP REQUEST${pendingPickupCount > 1 ? 'S' : ''}` 
+                : "Ad-Hoc Pickup Requests"}
             </Button>
           </>
         )}
@@ -166,9 +227,18 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   scroll: { padding: 16 },
   header: { marginBottom: 24 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   greeting: { fontSize: 24, fontWeight: 'bold', color: colors.textPrimary },
   date: { fontSize: 14, color: colors.textSecondary, marginTop: 4 },
+  bellButton: { padding: 8, position: 'relative', marginRight: 4 },
+  bellBadge: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.error, borderRadius: 10, minWidth: 18, height: 18, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 4 },
+  bellBadgeText: { color: '#FFF', fontSize: 11, fontWeight: 'bold' },
+
+  notificationBanner: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#2d1808', borderWidth: 1.5, borderColor: colors.warning, borderRadius: 14, padding: 14, marginBottom: 20 },
+  notificationIconBox: { backgroundColor: colors.warning, borderRadius: 10, width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
+  notificationTitle: { fontSize: 15, fontWeight: 'bold', color: colors.warning },
+  notificationSub: { fontSize: 12, color: colors.textSecondary, marginTop: 3 },
+
   statsContainer: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
   statCard: { flex: 1, backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginHorizontal: 4, borderWidth: 1, borderColor: colors.border },
   statLabel: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 },
