@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, ActivityIndicator, Alert, TouchableOpacity, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
-import { Button, IconButton } from 'react-native-paper';
+import { Button, IconButton, TextInput } from 'react-native-paper';
 import { api } from '@/services/api';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { useNavigation, useRouter } from 'expo-router';
@@ -36,6 +36,12 @@ export default function SettlementsList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [settlingId, setSettlingId] = useState<string | null>(null);
+
+  // Quick Fee Edit Modal State
+  const [feeModalVisible, setFeeModalVisible] = useState(false);
+  const [feeTripId, setFeeTripId] = useState<string | null>(null);
+  const [feeInputValue, setFeeInputValue] = useState('');
+  const [feeSaving, setFeeSaving] = useState(false);
 
   const fetchUnsettledTrips = async () => {
     try {
@@ -97,6 +103,33 @@ export default function SettlementsList() {
 
   const toggleExpand = (driverId: string) => {
     setExpandedDriverId(prev => (prev === driverId ? null : driverId));
+  };
+
+  const openFeeModal = (trip: any) => {
+    setFeeTripId(trip.id);
+    setFeeInputValue(String(parseFloat(trip.transportFee || '0')));
+    setFeeModalVisible(true);
+  };
+
+  const handleSaveFee = async () => {
+    const val = parseFloat(feeInputValue);
+    if (isNaN(val) || val < 0) {
+      Alert.alert('Invalid', 'Please enter a valid transport fee.');
+      return;
+    }
+    setFeeSaving(true);
+    try {
+      await api.patch(`/trips/${feeTripId}`, {
+        transportFee: val
+      });
+      Alert.alert('Saved', 'Transport fee updated successfully!');
+      setFeeModalVisible(false);
+      fetchUnsettledTrips();
+    } catch (e: any) {
+      Alert.alert('Error', e?.response?.data?.message || 'Failed to update fee');
+    } finally {
+      setFeeSaving(false);
+    }
   };
 
   // Perform Settlement for a single trip
@@ -273,9 +306,14 @@ export default function SettlementsList() {
                               </Text>
                             </View>
                             <View style={styles.amountCol}>
-                              <Text style={styles.amountColLabel}>Transport Fee:</Text>
-                              <Text style={[styles.amountColVal, { color: colors.secondary }]}>
-                                {formatCurrency(tripFee)}
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Text style={styles.amountColLabel}>Transport Fee:</Text>
+                                <TouchableOpacity onPress={() => openFeeModal(trip)}>
+                                  <Text style={styles.editFeeLink}>{tripFee === 0 ? '⚡ Set Fee' : '✏️ Edit'}</Text>
+                                </TouchableOpacity>
+                              </View>
+                              <Text style={[styles.amountColVal, { color: tripFee === 0 ? colors.warning : colors.secondary }]}>
+                                {tripFee === 0 ? 'Not Set' : formatCurrency(tripFee)}
                               </Text>
                             </View>
                           </View>
@@ -306,6 +344,52 @@ export default function SettlementsList() {
           }
         />
       )}
+
+      {/* QUICK TRANSPORT FEE MODAL */}
+      <Modal
+        visible={feeModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setFeeModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Set Driver Transport Fee</Text>
+            <Text style={styles.modalSubtitle}>Enter the transport fee for this completed trip:</Text>
+            
+            <TextInput
+              label="Transport Fee (₹)"
+              value={feeInputValue}
+              onChangeText={setFeeInputValue}
+              mode="outlined"
+              keyboardType="numeric"
+              style={styles.modalInput}
+              autoFocus
+            />
+
+            <View style={styles.modalBtnRow}>
+              <Button
+                mode="contained"
+                onPress={handleSaveFee}
+                loading={feeSaving}
+                disabled={feeSaving}
+                style={[styles.modalBtn, { backgroundColor: colors.secondary }]}
+              >
+                Save Fee
+              </Button>
+              <Button
+                mode="outlined"
+                onPress={() => setFeeModalVisible(false)}
+                disabled={feeSaving}
+                style={[styles.modalBtn, { marginLeft: 8 }]}
+                textColor={colors.textPrimary}
+              >
+                Cancel
+              </Button>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -345,7 +429,17 @@ const styles = StyleSheet.create({
   amountColLabel: { color: colors.textSecondary, fontSize: 11 },
   amountColVal: { fontWeight: 'bold', fontSize: 14, marginTop: 2 },
   
+  editFeeLink: { color: colors.warning, fontSize: 11, fontWeight: 'bold' },
   settleSingleBtn: { borderColor: colors.primary, marginTop: 6, borderRadius: 6 },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.6)', padding: 20 },
+  modalCard: { width: '100%', backgroundColor: colors.surface, borderRadius: 16, padding: 20, borderWidth: 1, borderColor: colors.border },
+  modalTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 4 },
+  modalSubtitle: { fontSize: 13, color: colors.textSecondary, marginBottom: 16 },
+  modalInput: { backgroundColor: colors.surfaceAlt, marginBottom: 20 },
+  modalBtnRow: { flexDirection: 'row', justifyContent: 'flex-end' },
+  modalBtn: { flex: 1, borderRadius: 8 },
 
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   empty: { color: colors.textSecondary, textAlign: 'center', fontSize: 16, paddingHorizontal: 24 }

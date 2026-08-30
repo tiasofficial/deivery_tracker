@@ -129,19 +129,17 @@ export default function TripsList() {
               
               <View style={styles.cardFooter}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.feeText}>Fee: {formatCurrency(parseFloat(item.transportFee))}</Text>
+                  {item.status === 'COMPLETED' && parseFloat(item.transportFee || '0') === 0 ? (
+                    <View style={styles.setFeeBadge}>
+                      <Text style={styles.setFeeBadgeText}>⚡ Set Transport Fee</Text>
+                    </View>
+                  ) : (
+                    <Text style={styles.feeText}>Transport Fee: {formatCurrency(parseFloat(item.transportFee || '0'))}</Text>
+                  )}
                   {item.totalCollected !== null && (
-                    <Text style={styles.collectedText}>Collected: {formatCurrency(parseFloat(item.totalCollected))}</Text>
+                    <Text style={styles.collectedText}>Collected: {formatCurrency(parseFloat(item.totalCollected || '0'))}</Text>
                   )}
                 </View>
-                {item.totalCollected !== null && (
-                  <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={{ fontSize: 11, color: colors.textSecondary }}>Net Final:</Text>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: colors.secondary }}>
-                      {formatCurrency(parseFloat(item.totalCollected) - parseFloat(item.transportFee))}
-                    </Text>
-                  </View>
-                )}
               </View>
             </TouchableOpacity>
           )}
@@ -180,6 +178,8 @@ const styles = StyleSheet.create({
   infoText: { color: colors.textSecondary, marginLeft: 6, fontSize: 14 },
   cardFooter: { flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
   feeText: { color: colors.textSecondary, fontSize: 14 },
+  setFeeBadge: { backgroundColor: colors.warning + '22', borderColor: colors.warning, borderWidth: 1, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, alignSelf: 'flex-start', marginBottom: 4 },
+  setFeeBadgeText: { color: colors.warning, fontWeight: 'bold', fontSize: 12 },
   collectedText: { color: colors.success, fontSize: 14, fontWeight: 'bold' },
   emptyContainer: { alignItems: 'center', marginTop: 80 },
   empty: { color: colors.textSecondary, textAlign: 'center', marginTop: 12, fontSize: 16 },
