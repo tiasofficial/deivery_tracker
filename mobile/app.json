@@ -34,11 +34,7 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {},
-      "eas": {
-        "projectId": "42f57386-de18-4fe8-8b9f-a3430bfb8646"
-      }
-    },
-    "owner": "tiasofficials-team"
+      "router": {}
+    }
   }
 }
