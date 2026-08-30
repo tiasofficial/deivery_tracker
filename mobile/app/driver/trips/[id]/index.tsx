@@ -157,7 +157,7 @@ export default function TripOverview() {
           <TouchableOpacity 
             key={stop.id} 
             style={styles.stopCard} 
-            onPress={() => router.push({ pathname: `/driver/trips/[id]/stop/[stopId]`, params: { id: trip.id, stopId: stop.id } })}
+            onPress={() => router.push(`/driver/trips/${trip.id}/stop/${stop.id}` as any)}
           >
             <View style={styles.stopLeft}>
               <View style={[styles.stopNumber, (stop.status === 'COLLECTED' || stop.status === 'SKIPPED') && styles.stopNumberCompleted]}>

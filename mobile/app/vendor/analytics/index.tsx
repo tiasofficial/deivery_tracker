@@ -25,17 +25,25 @@ export default function AnalyticsDashboard() {
 
   const fetchAnalyticsData = async () => {
     try {
-      const [summaryRes, driversRes, boxesRes, collectionsRes] = await Promise.all([
+      const [summaryRes, driversRes, boxesRes, collectionsRes] = await Promise.allSettled([
         api.get('/analytics/summary?period=month'),
         api.get('/analytics/drivers?period=month'),
         api.get('/analytics/boxes?period=month'),
         api.get('/analytics/collections')
       ]);
 
-      if (summaryRes.data.success) setSummary(summaryRes.data.data);
-      if (driversRes.data.success) setDrivers(driversRes.data.data || []);
-      if (boxesRes.data.success) setBoxes(boxesRes.data.data || []);
-      if (collectionsRes.data.success) setCollections(collectionsRes.data.data || []);
+      if (summaryRes.status === 'fulfilled' && summaryRes.value.data?.success) {
+        setSummary(summaryRes.value.data.data || { totalTrips: 0, totalCollection: 0, activeDrivers: 0, unsettledBalance: 0 });
+      }
+      if (driversRes.status === 'fulfilled' && driversRes.value.data?.success) {
+        setDrivers(driversRes.value.data.data || []);
+      }
+      if (boxesRes.status === 'fulfilled' && boxesRes.value.data?.success) {
+        setBoxes(boxesRes.value.data.data || []);
+      }
+      if (collectionsRes.status === 'fulfilled' && collectionsRes.value.data?.success) {
+        setCollections(collectionsRes.value.data.data || []);
+      }
 
     } catch (error) {
       console.error('Failed to load analytics:', error);

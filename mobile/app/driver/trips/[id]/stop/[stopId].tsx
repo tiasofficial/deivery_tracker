@@ -10,6 +10,9 @@ import { api } from '@/services/api';
 export default function StopDetail() {
   const { id: tripId, stopId } = useLocalSearchParams();
   const router = useRouter();
+
+  const rawTripId = Array.isArray(tripId) ? tripId[0] : tripId;
+  const rawStopId = Array.isArray(stopId) ? stopId[0] : stopId;
   
   const [stop, setStop] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -19,19 +22,20 @@ export default function StopDetail() {
   const [showSkipInput, setShowSkipInput] = useState(false);
 
   const fetchStopDetails = async () => {
+    if (!rawTripId || !rawStopId) return;
     try {
-      const res = await api.get(`/trips/${tripId}`);
-      const trip = res.data.data;
-      const currentStop = trip?.stops?.find((s: any) => s.id === stopId);
+      const res = await api.get(`/trips/${rawTripId}`);
+      const trip = res.data?.data;
+      const currentStop = trip?.stops?.find((s: any) => String(s.id).trim() === String(rawStopId).trim());
       if (currentStop) {
-        console.log('--- MOBILE APP RECEIVED STOP DATA ---');
-        console.log(JSON.stringify(currentStop, null, 2));
         setStop(currentStop);
         setCollectionAmount(currentStop.collectedAmount ? String(currentStop.collectedAmount) : '');
+      } else {
+        Alert.alert('Notice', 'Stop information not found in this trip.');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to load stop details:', error);
-      Alert.alert('Error', 'Failed to load stop details');
+      Alert.alert('Error', error?.response?.data?.message || 'Failed to load stop details');
     } finally {
       setLoading(false);
     }
@@ -39,13 +43,14 @@ export default function StopDetail() {
 
   useEffect(() => {
     fetchStopDetails();
-  }, [tripId, stopId]);
+  }, [rawTripId, rawStopId]);
 
   // Arrive Stop
   const handleArrive = async () => {
+    if (!rawTripId || !rawStopId) return;
     setActionLoading(true);
     try {
-      await api.patch(`/trips/${tripId}/stops/${stopId}/arrive`);
+      await api.patch(`/trips/${rawTripId}/stops/${rawStopId}/arrive`);
       Alert.alert('Arrived', 'You have arrived at the stop location.');
       fetchStopDetails();
     } catch (error: any) {
@@ -57,9 +62,10 @@ export default function StopDetail() {
 
   // Deliver Stop
   const handleDeliver = async () => {
+    if (!rawTripId || !rawStopId) return;
     setActionLoading(true);
     try {
-      await api.patch(`/trips/${tripId}/stops/${stopId}/deliver`);
+      await api.patch(`/trips/${rawTripId}/stops/${rawStopId}/deliver`);
       Alert.alert('Delivered', 'Deliveries marked as complete.');
       fetchStopDetails();
     } catch (error: any) {
@@ -75,14 +81,13 @@ export default function StopDetail() {
       Alert.alert('Required', 'Please enter the collected cash amount.');
       return;
     }
+    if (!rawTripId || !rawStopId) return;
     setActionLoading(true);
     try {
-      await api.post(`/trips/${tripId}/stops/${stopId}/collect`, {
+      await api.post(`/trips/${rawTripId}/stops/${rawStopId}/collect`, {
         amount: parseFloat(collectionAmount)
       });
-      // Navigate to trip overview (not just back) so driver sees transport fee input
-      // if this was the last stop. router.replace avoids a stale back-stack entry.
-      router.replace({ pathname: `/driver/trips/[id]`, params: { id: tripId as string } });
+      router.replace({ pathname: `/driver/trips/[id]`, params: { id: rawTripId as string } });
     } catch (error: any) {
       Alert.alert('Error', error?.response?.data?.message || 'Failed to submit collection');
     } finally {
@@ -96,9 +101,10 @@ export default function StopDetail() {
       Alert.alert('Required', 'Please enter a reason for skipping this stop.');
       return;
     }
+    if (!rawTripId || !rawStopId) return;
     setActionLoading(true);
     try {
-      await api.patch(`/trips/${tripId}/stops/${stopId}/skip`, {
+      await api.patch(`/trips/${rawTripId}/stops/${rawStopId}/skip`, {
         reason: skipReason
       });
       Alert.alert('Skipped', 'Stop has been skipped.');
