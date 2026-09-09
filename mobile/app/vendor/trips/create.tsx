@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { TextInput, Button, IconButton } from 'react-native-paper';
@@ -92,10 +92,8 @@ export default function CreateTrip() {
 
   const handleDeleteBoxType = (item: { id?: string; name: string }) => {
     if (Platform.OS === 'web') {
-      const confirmed = typeof window !== 'undefined' ? window.confirm(`Are you sure you want to delete "${item.name}" from your item list?`) : true;
-      if (confirmed) {
-        performDelete(item);
-      }
+      // Instant delete on web
+      performDelete(item);
       return;
     }
 
@@ -353,20 +351,23 @@ export default function CreateTrip() {
                           </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
+                        <Pressable
                           onPress={(e) => {
                             e?.stopPropagation?.();
                             handleDeleteBoxType(item);
                           }}
-                          style={styles.chipDeleteBtn}
-                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          style={({ pressed }) => [
+                            styles.chipDeleteBtn,
+                            pressed && { opacity: 0.6 }
+                          ]}
+                          hitSlop={8}
                         >
                           <Ionicons 
                             name="close-circle" 
                             size={16} 
                             color={isSelected ? colors.primary : colors.error} 
                           />
-                        </TouchableOpacity>
+                        </Pressable>
                       </View>
                     );
                   })}
@@ -439,7 +440,13 @@ const styles = StyleSheet.create({
   boxChipSelected: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
   boxChipText: { color: colors.textSecondary, fontSize: 12 },
   boxChipTextSelected: { color: colors.primary, fontWeight: 'bold' },
-  chipDeleteBtn: { marginLeft: 6, padding: 2, justifyContent: 'center', alignItems: 'center' },
+  chipDeleteBtn: {
+    marginLeft: 6,
+    padding: 2,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {})
+  },
   qtyInput: { width: 60, height: 40, backgroundColor: colors.surfaceAlt, marginLeft: 8 },
   addBoxBtn: { alignSelf: 'flex-start', marginTop: 8 },
   addStopBtn: { borderColor: colors.secondary, marginBottom: 32, paddingVertical: 4 },
