@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { TextInput, Button, IconButton } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { api } from '@/services/api';
 
@@ -16,8 +17,6 @@ interface StopItem {
   merchantName: string;
   boxes: BoxItem[];
 }
-
-
 
 export default function CreateTrip() {
   const router = useRouter();
@@ -38,7 +37,11 @@ export default function CreateTrip() {
     }
   ]);
 
-  const [availableBoxTypes, setAvailableBoxTypes] = useState<string[]>(['Bata Box', 'Nirmal Box', 'Bala Box']);
+  const [availableBoxTypes, setAvailableBoxTypes] = useState<{ id?: string; name: string }[]>([
+    { name: 'Bata Box' },
+    { name: 'Nirmal Box' },
+    { name: 'Bala Box' }
+  ]);
 
   // Load live drivers and box types from database
   React.useEffect(() => {
@@ -59,9 +62,9 @@ export default function CreateTrip() {
       try {
         const boxTypesRes = await api.get('/boxtypes');
         if (boxTypesRes.data.success && boxTypesRes.data.data) {
-          const names = boxTypesRes.data.data.map((b: any) => b.name);
-          if (names.length > 0) {
-            setAvailableBoxTypes(names);
+          const list = boxTypesRes.data.data.map((b: any) => ({ id: b.id, name: b.name }));
+          if (list.length > 0) {
+            setAvailableBoxTypes(list);
           }
         }
       } catch (error) {
@@ -70,6 +73,32 @@ export default function CreateTrip() {
     };
     fetchData();
   }, []);
+
+  const handleDeleteBoxType = (item: { id?: string; name: string }) => {
+    Alert.alert(
+      'Delete Saved Item',
+      `Are you sure you want to delete "${item.name}" from your item list?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (item.id) {
+                await api.delete(`/boxtypes/${item.id}`);
+              } else {
+                await api.delete(`/boxtypes/${encodeURIComponent(item.name)}`);
+              }
+            } catch (err) {
+              console.log('Error deleting on backend:', err);
+            }
+            setAvailableBoxTypes(prev => prev.filter(b => b.name !== item.name));
+          }
+        }
+      ]
+    );
+  };
 
   // Date picker handler
   const onDateChange = (event: any, selectedDate?: Date) => {
@@ -289,20 +318,40 @@ export default function CreateTrip() {
                   )}
                 </View>
                 
-                {/* Quick Select Chips */}
+                {/* Quick Select Chips with Delete Option */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8, paddingBottom: 4 }}>
-                  {availableBoxTypes.map(type => {
-                    const isSelected = type === box.boxType;
+                  {availableBoxTypes.map(item => {
+                    const isSelected = item.name === box.boxType;
                     return (
-                      <TouchableOpacity
-                        key={type}
-                        style={[styles.boxChip, isSelected && styles.boxChipSelected, { marginRight: 8 }]}
-                        onPress={() => updateBoxType(stopIdx, boxIdx, type)}
+                      <View
+                        key={item.id || item.name}
+                        style={[
+                          styles.boxChip,
+                          isSelected && styles.boxChipSelected,
+                          { marginRight: 8, flexDirection: 'row', alignItems: 'center' }
+                        ]}
                       >
-                        <Text style={[styles.boxChipText, isSelected && styles.boxChipTextSelected]}>
-                          {type}
-                        </Text>
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => updateBoxType(stopIdx, boxIdx, item.name)}
+                          style={{ paddingVertical: 2, paddingLeft: 2, paddingRight: 4 }}
+                        >
+                          <Text style={[styles.boxChipText, isSelected && styles.boxChipTextSelected]}>
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          onPress={() => handleDeleteBoxType(item)}
+                          style={styles.chipDeleteBtn}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          <Ionicons 
+                            name="close-circle" 
+                            size={16} 
+                            color={isSelected ? colors.primary : colors.error} 
+                          />
+                        </TouchableOpacity>
+                      </View>
                     );
                   })}
                 </ScrollView>
@@ -370,10 +419,11 @@ const styles = StyleSheet.create({
   itemsLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 8, marginTop: 4 },
   boxRow: { marginBottom: 12 },
   pickerContainer: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
-  boxChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+  boxChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   boxChipSelected: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
   boxChipText: { color: colors.textSecondary, fontSize: 12 },
   boxChipTextSelected: { color: colors.primary, fontWeight: 'bold' },
+  chipDeleteBtn: { marginLeft: 6, padding: 2, justifyContent: 'center', alignItems: 'center' },
   qtyInput: { width: 60, height: 40, backgroundColor: colors.surfaceAlt, marginLeft: 8 },
   addBoxBtn: { alignSelf: 'flex-start', marginTop: 8 },
   addStopBtn: { borderColor: colors.secondary, marginBottom: 32, paddingVertical: 4 },
