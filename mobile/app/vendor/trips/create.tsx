@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { TextInput, Button, IconButton } from 'react-native-paper';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useNavigation } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { api } from '@/services/api';
@@ -20,6 +20,7 @@ interface StopItem {
 
 export default function CreateTrip() {
   const router = useRouter();
+  const navigation = useNavigation();
   const params = useLocalSearchParams();
   
   // Form State
@@ -33,52 +34,59 @@ export default function CreateTrip() {
   const [stops, setStops] = useState<StopItem[]>([
     {
       merchantName: '',
-      boxes: [{ boxType: 'Bata Box', quantity: (params.adHocBoxes as string) || '1' }]
+      boxes: [{ boxType: '', quantity: (params.adHocBoxes as string) || '1' }]
     }
   ]);
 
   const [availableBoxTypes, setAvailableBoxTypes] = useState<{ id?: string; name: string }[]>([
+    { name: 'Phenyl' },
     { name: 'Bata Box' },
     { name: 'Nirmal Box' },
     { name: 'Bala Box' }
   ]);
 
-  // Load live drivers and box types from database
-  React.useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const driversRes = await api.get('/drivers');
-        if (driversRes.data.success && driversRes.data.data) {
-          const list = driversRes.data.data;
-          setDrivers(list);
-          if (list.length > 0 && !selectedDriverId) {
-            setSelectedDriverId(list[0].id);
-          }
+  const fetchData = async () => {
+    try {
+      const driversRes = await api.get('/drivers');
+      if (driversRes.data.success && driversRes.data.data) {
+        const list = driversRes.data.data;
+        setDrivers(list);
+        if (list.length > 0 && !selectedDriverId) {
+          setSelectedDriverId(list[0].id);
         }
-      } catch (error) {
-        console.error('Failed to load drivers list:', error);
       }
-      
-      try {
-        const boxTypesRes = await api.get('/boxtypes');
-        if (boxTypesRes.data.success && boxTypesRes.data.data) {
-          const list = boxTypesRes.data.data.map((b: any) => ({ id: b.id, name: b.name }));
-          if (list.length > 0) {
-            setAvailableBoxTypes(list);
-          }
+    } catch (error) {
+      console.error('Failed to load drivers list:', error);
+    }
+    
+    try {
+      const boxTypesRes = await api.get('/boxtypes');
+      if (boxTypesRes.data.success && boxTypesRes.data.data) {
+        const list = boxTypesRes.data.data.map((b: any) => ({ id: b.id, name: b.name }));
+        if (list.length > 0) {
+          // Merge default Phenyl if not already present
+          const hasPhenyl = list.some((item: any) => item.name.toLowerCase() === 'phenyl');
+          const merged = hasPhenyl ? list : [{ name: 'Phenyl' }, ...list];
+          setAvailableBoxTypes(merged);
         }
-      } catch (error) {
-        console.error('Failed to load box types:', error);
       }
-    };
+    } catch (error) {
+      console.error('Failed to load box types:', error);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
-  }, []);
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchData();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   const performDelete = async (item: { id?: string; name: string }) => {
-    // 1. Immediately remove from UI list
+    // Immediately remove from UI list
     setAvailableBoxTypes(prev => prev.filter(b => b.name !== item.name));
     
-    // 2. Call backend
     try {
       if (item.id) {
         await api.delete(`/boxtypes/${item.id}`);
@@ -92,7 +100,6 @@ export default function CreateTrip() {
 
   const handleDeleteBoxType = (item: { id?: string; name: string }) => {
     if (Platform.OS === 'web') {
-      // Instant delete on web
       performDelete(item);
       return;
     }
@@ -121,12 +128,12 @@ export default function CreateTrip() {
 
   // Add/Remove Stops
   const addStop = () => {
-    setStops([...stops, { merchantName: '', boxes: [{ boxType: 'Bata Box', quantity: '1' }] }]);
+    setStops(prev => [...prev, { merchantName: '', boxes: [{ boxType: '', quantity: '1' }] }]);
   };
 
   const removeStop = (stopIdx: number) => {
     if (stops.length === 1) return;
-    setStops(stops.filter((_, idx) => idx !== stopIdx));
+    setStops(prev => prev.filter((_, idx) => idx !== stopIdx));
   };
 
   const updateStopMerchant = (stopIdx: number, text: string) => {
@@ -138,7 +145,7 @@ export default function CreateTrip() {
   // Add/Remove Box Types within a stop
   const addBoxItem = (stopIdx: number) => {
     const updated = [...stops];
-    updated[stopIdx].boxes.push({ boxType: 'Bata Box', quantity: '1' });
+    updated[stopIdx].boxes.push({ boxType: '', quantity: '1' });
     setStops(updated);
   };
 
@@ -161,18 +168,37 @@ export default function CreateTrip() {
     setStops(updated);
   };
 
+  // Reset all inputs
+  const resetForm = () => {
+    setNotes('');
+    setTripDate(new Date());
+    setStops([
+      {
+        merchantName: '',
+        boxes: [{ boxType: '', quantity: '1' }]
+      }
+    ]);
+  };
+
   // Submit Trip
   const handleSubmit = async () => {
     // Validation
     for (let i = 0; i < stops.length; i++) {
       if (!stops[i].merchantName.trim()) {
-        Alert.alert('Required', `Please enter a merchant name for Stop #${i + 1}`);
+        const msg = `Please enter a merchant name for Stop #${i + 1}`;
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Required', msg);
         return;
       }
       for (let j = 0; j < stops[i].boxes.length; j++) {
+        if (!stops[i].boxes[j].boxType.trim()) {
+          const msg = `Please enter or select an item name for item #${j + 1} at Stop #${i + 1}`;
+          Platform.OS === 'web' ? alert(msg) : Alert.alert('Required', msg);
+          return;
+        }
         const qty = parseInt(stops[i].boxes[j].quantity);
         if (isNaN(qty) || qty <= 0) {
-          Alert.alert('Required', `Please enter a valid quantity for item #${j + 1} at Stop #${i + 1}`);
+          const msg = `Please enter a valid quantity for item #${j + 1} at Stop #${i + 1}`;
+          Platform.OS === 'web' ? alert(msg) : Alert.alert('Required', msg);
           return;
         }
       }
@@ -182,10 +208,10 @@ export default function CreateTrip() {
     try {
       // Map frontend models to API body formats
       const apiStops = stops.map((s, idx) => ({
-        merchantName: s.merchantName,
+        merchantName: s.merchantName.trim(),
         stopOrder: idx + 1,
         boxes: s.boxes.map(b => ({
-          boxName: b.boxType,
+          boxName: b.boxType.trim(),
           quantity: parseInt(b.quantity)
         }))
       }));
@@ -199,10 +225,27 @@ export default function CreateTrip() {
       };
 
       await api.post('/trips', body);
-      Alert.alert('Success', 'Trip successfully created!');
+
+      // Add any newly typed custom box names into availableBoxTypes permanently
+      const newItems = stops.flatMap(s => s.boxes.map(b => b.boxType.trim())).filter(n => n.length > 0);
+      setAvailableBoxTypes(prev => {
+        const existing = new Set(prev.map(p => p.name.toLowerCase()));
+        const additions = newItems.filter(name => !existing.has(name.toLowerCase())).map(name => ({ name }));
+        return [...prev, ...additions];
+      });
+
+      // Automatically reset form
+      resetForm();
+
+      if (Platform.OS === 'web') {
+        alert('Trip successfully created!');
+      } else {
+        Alert.alert('Success', 'Trip successfully created!');
+      }
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.response?.data?.message || 'Failed to create trip');
+      const errMsg = e?.response?.data?.message || 'Failed to create trip';
+      Platform.OS === 'web' ? alert(errMsg) : Alert.alert('Error', errMsg);
     } finally {
       setLoading(false);
     }
@@ -301,14 +344,14 @@ export default function CreateTrip() {
             <Text style={styles.itemsLabel}>Deliveries at this Stop</Text>
             {stop.boxes.map((box, boxIdx) => (
               <View key={boxIdx} style={styles.boxRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={styles.inputRow}>
                   <TextInput
                     label="Item Name"
                     value={box.boxType}
                     onChangeText={(text) => updateBoxType(stopIdx, boxIdx, text)}
                     mode="outlined"
-                    style={{ flex: 1, backgroundColor: colors.surfaceAlt }}
-                    placeholder="Type or select below"
+                    style={styles.itemNameInput}
+                    placeholder="Type item name or choose chip"
                   />
                   <TextInput
                     label="Qty"
@@ -324,15 +367,15 @@ export default function CreateTrip() {
                       iconColor={colors.error}
                       size={20}
                       onPress={() => removeBoxItem(stopIdx, boxIdx)}
-                      style={{ margin: 0 }}
+                      style={styles.deleteBoxBtn}
                     />
                   )}
                 </View>
                 
                 {/* Quick Select Chips with Delete Option */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8, paddingBottom: 4 }}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 6, paddingBottom: 4 }}>
                   {availableBoxTypes.map(item => {
-                    const isSelected = item.name === box.boxType;
+                    const isSelected = item.name.toLowerCase() === (box.boxType || '').trim().toLowerCase();
                     return (
                       <View
                         key={item.id || item.name}
@@ -434,8 +477,11 @@ const styles = StyleSheet.create({
   removeText: { color: colors.error, fontSize: 13 },
   input: { marginBottom: 12, backgroundColor: colors.surfaceAlt },
   itemsLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 8, marginTop: 4 },
-  boxRow: { marginBottom: 12 },
-  pickerContainer: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
+  boxRow: { marginBottom: 14 },
+  inputRow: { flexDirection: 'row', alignItems: 'center' },
+  itemNameInput: { flex: 1, backgroundColor: colors.surfaceAlt },
+  qtyInput: { width: 75, marginLeft: 8, backgroundColor: colors.surfaceAlt },
+  deleteBoxBtn: { margin: 0, marginLeft: 2 },
   boxChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   boxChipSelected: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
   boxChipText: { color: colors.textSecondary, fontSize: 12 },
@@ -447,7 +493,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     ...(Platform.OS === 'web' ? ({ cursor: 'pointer' } as any) : {})
   },
-  qtyInput: { width: 60, height: 40, backgroundColor: colors.surfaceAlt, marginLeft: 8 },
   addBoxBtn: { alignSelf: 'flex-start', marginTop: 8 },
   addStopBtn: { borderColor: colors.secondary, marginBottom: 32, paddingVertical: 4 },
   submitBtn: { backgroundColor: colors.primary, marginBottom: 40, borderRadius: 10 },
