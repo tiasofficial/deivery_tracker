@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { TextInput, Button, IconButton } from 'react-native-paper';
@@ -74,7 +74,31 @@ export default function CreateTrip() {
     fetchData();
   }, []);
 
+  const performDelete = async (item: { id?: string; name: string }) => {
+    // 1. Immediately remove from UI list
+    setAvailableBoxTypes(prev => prev.filter(b => b.name !== item.name));
+    
+    // 2. Call backend
+    try {
+      if (item.id) {
+        await api.delete(`/boxtypes/${item.id}`);
+      } else {
+        await api.delete(`/boxtypes/${encodeURIComponent(item.name)}`);
+      }
+    } catch (err) {
+      console.log('Error deleting on backend:', err);
+    }
+  };
+
   const handleDeleteBoxType = (item: { id?: string; name: string }) => {
+    if (Platform.OS === 'web') {
+      const confirmed = typeof window !== 'undefined' ? window.confirm(`Are you sure you want to delete "${item.name}" from your item list?`) : true;
+      if (confirmed) {
+        performDelete(item);
+      }
+      return;
+    }
+
     Alert.alert(
       'Delete Saved Item',
       `Are you sure you want to delete "${item.name}" from your item list?`,
@@ -83,18 +107,7 @@ export default function CreateTrip() {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: async () => {
-            try {
-              if (item.id) {
-                await api.delete(`/boxtypes/${item.id}`);
-              } else {
-                await api.delete(`/boxtypes/${encodeURIComponent(item.name)}`);
-              }
-            } catch (err) {
-              console.log('Error deleting on backend:', err);
-            }
-            setAvailableBoxTypes(prev => prev.filter(b => b.name !== item.name));
-          }
+          onPress: () => performDelete(item)
         }
       ]
     );
@@ -341,7 +354,10 @@ export default function CreateTrip() {
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          onPress={() => handleDeleteBoxType(item)}
+                          onPress={(e) => {
+                            e?.stopPropagation?.();
+                            handleDeleteBoxType(item);
+                          }}
                           style={styles.chipDeleteBtn}
                           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                         >
