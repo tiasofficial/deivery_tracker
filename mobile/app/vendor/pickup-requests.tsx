@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from 'react-native-paper';
 import { useRouter, useNavigation } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '../../constants/colors';
 import { api } from '@/services/api';
 
@@ -12,6 +13,7 @@ export default function PickupRequests() {
   const [requests, setRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'HISTORY'>('PENDING');
 
   const fetchRequests = async () => {
     try {
@@ -39,6 +41,9 @@ export default function PickupRequests() {
   };
 
   const handleApprove = async (id: string, boxCount: number, driverId: string) => {
+    // 1. Immediately remove from local pending list so it disappears instantly
+    setRequests(prev => prev.map(r => r.id === id ? { ...r, status: 'APPROVED' } : r));
+
     try {
       await api.patch(`/pickup-requests/${id}`, { status: 'APPROVED' });
       router.push({
@@ -49,26 +54,52 @@ export default function PickupRequests() {
         }
       });
     } catch (e: any) {
-      Alert.alert('Error', 'Failed to approve request.');
+      console.error('Failed to update status on server:', e);
     }
   };
+
+  const pendingList = requests.filter(r => r.status === 'PENDING');
+  const historyList = requests.filter(r => r.status !== 'PENDING');
+  const displayList = activeTab === 'PENDING' ? pendingList : historyList;
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.backBtn} onPress={() => router.back()}>← Back</Text>
+        <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 16 }}>
+          <Text style={styles.backBtn}>← Back</Text>
+        </TouchableOpacity>
         <Text style={styles.title}>Pickup Requests</Text>
       </View>
 
+      {/* Tabs */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'PENDING' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('PENDING')}
+        >
+          <Text style={[styles.tabText, activeTab === 'PENDING' && styles.tabTextActive]}>
+            Pending ({pendingList.length})
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.tabBtn, activeTab === 'HISTORY' && styles.tabBtnActive]}
+          onPress={() => setActiveTab('HISTORY')}
+        >
+          <Text style={[styles.tabText, activeTab === 'HISTORY' && styles.tabTextActive]}>
+            History ({historyList.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <FlatList
-        data={requests}
+        data={displayList}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.driverName}>Driver: {item.driver?.name}</Text>
+              <Text style={styles.driverName}>Driver: {item.driver?.name || 'Driver'}</Text>
               <View style={[styles.badge, { backgroundColor: item.status === 'PENDING' ? colors.warning + '33' : colors.success + '33' }]}>
                 <Text style={{ color: item.status === 'PENDING' ? colors.warning : colors.success, fontSize: 10, fontWeight: 'bold' }}>{item.status}</Text>
               </View>
@@ -78,16 +109,31 @@ export default function PickupRequests() {
 
             {item.status === 'PENDING' && (
               <Button
-               mode="contained"
-               style={styles.approveBtn}
-               onPress={() => handleApprove(item.id, item.boxCount, item.driverId)}
-               >
+                mode="contained"
+                style={styles.approveBtn}
+                onPress={() => handleApprove(item.id, item.boxCount, item.driverId)}
+              >
                 Create Trip for this Request
               </Button>
             )}
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No pickup requests found.</Text>}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons 
+              name={activeTab === 'PENDING' ? "checkmark-circle-outline" : "file-tray-outline"} 
+              size={54} 
+              color={activeTab === 'PENDING' ? colors.success : colors.textSecondary} 
+              style={{ marginBottom: 12 }}
+            />
+            <Text style={styles.emptyTitle}>
+              {activeTab === 'PENDING' ? 'All Requests Handled!' : 'No Past Requests'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {activeTab === 'PENDING' ? 'No pending ad-hoc requests from drivers.' : 'Approved requests will be logged here.'}
+            </Text>
+          </View>
+        }
       />
     </SafeAreaView>
   );
@@ -96,8 +142,13 @@ export default function PickupRequests() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   header: { padding: 16, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center' },
-  backBtn: { color: colors.primary, fontSize: 16, fontWeight: 'bold', marginRight: 16 },
+  backBtn: { color: colors.primary, fontSize: 16, fontWeight: 'bold' },
   title: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary },
+  tabContainer: { flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
+  tabBtn: { flex: 1, paddingVertical: 10, alignItems: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
+  tabBtnActive: { borderBottomColor: colors.primary },
+  tabText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+  tabTextActive: { color: colors.primary, fontWeight: 'bold' },
   list: { padding: 16 },
   card: { backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: colors.border },
   cardHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
@@ -105,6 +156,8 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
   boxes: { fontSize: 15, color: colors.textSecondary, marginBottom: 8 },
   date: { fontSize: 12, color: colors.textSecondary, marginBottom: 12 },
-  approveBtn: { backgroundColor: colors.primary, borderRadius: 8 },
-  empty: { textAlign: 'center', color: colors.textSecondary, marginTop: 40 }
+  approveBtn: { backgroundColor: colors.primary, borderRadius: 8, marginTop: 4 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', marginTop: 60, paddingHorizontal: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 6 },
+  emptySubtitle: { fontSize: 14, color: colors.textSecondary, textAlign: 'center' }
 });
