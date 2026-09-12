@@ -3,9 +3,10 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIn
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
-import { Button, TextInput } from 'react-native-paper';
+import { Button } from 'react-native-paper';
 import { getStopStatusColor } from '@/utils/statusHelpers';
 import { api } from '@/services/api';
+import TripLedgerTable from '@/components/common/TripLedgerTable';
 
 export default function TripOverview() {
   const { id: tripId } = useLocalSearchParams();
@@ -16,7 +17,6 @@ export default function TripOverview() {
   const [trip, setTrip] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [transportFee, setTransportFee] = useState('');
 
   const fetchTripDetails = async () => {
     try {
@@ -95,7 +95,7 @@ export default function TripOverview() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backBtn}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Trip Route Overview</Text>
+        <Text style={styles.title}>Trip Overview</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
@@ -124,7 +124,7 @@ export default function TripOverview() {
           {/* DRIVER COMPLETES TRIP */}
           {trip.status !== 'COMPLETED' && trip.status !== 'SETTLED' && allStopsProcessed && (
             <View style={styles.completionContainer}>
-              <Text style={styles.completeHeader}>Complete Delivery Route</Text>
+              <Text style={styles.completeHeader}>All Stops Processed</Text>
               <Button 
                 mode="contained" 
                 style={styles.completeBtn}
@@ -137,48 +137,53 @@ export default function TripOverview() {
             </View>
           )}
 
-          {/* DISPLAY TRANSPORT FEE AND COLLECTED AMOUNT IF COMPLETED */}
-          {(trip.status === 'COMPLETED' || trip.status === 'SETTLED') && (
-            <>
-              <View style={styles.feeLabelRow}>
-                <Text style={styles.feeLabel}>Total Cash Collected:</Text>
-                <Text style={[styles.feeValue, { color: colors.success }]}>₹{trip.totalCollected || 0}</Text>
-              </View>
-              <View style={styles.feeLabelRow}>
-                <Text style={styles.feeLabel}>Transport Fee:</Text>
-                <Text style={[styles.feeValue, { color: colors.secondary }]}>₹{trip.transportFee || 0}</Text>
-              </View>
-            </>
-          )}
+          {/* DISPLAY TRANSPORT FEE AND COLLECTED AMOUNT */}
+          <View style={styles.feeLabelRow}>
+            <Text style={styles.feeLabel}>Total Cash Collected:</Text>
+            <Text style={[styles.feeValue, { color: colors.success }]}>₹{trip.totalCollected || 0}</Text>
+          </View>
+          <View style={styles.feeLabelRow}>
+            <Text style={styles.feeLabel}>Transport Fee:</Text>
+            <Text style={[styles.feeValue, { color: colors.secondary }]}>₹{trip.transportFee || 0}</Text>
+          </View>
         </View>
 
-        <Text style={styles.timelineTitle}>Timeline / Stops</Text>
-        {trip.stops && trip.stops.map((stop: any, idx: number) => (
-          <TouchableOpacity 
-            key={stop.id} 
-            style={styles.stopCard} 
-            onPress={() => router.push(`/driver/trips/${trip.id}/stop/${stop.id}` as any)}
-          >
-            <View style={styles.stopLeft}>
-              <View style={[styles.stopNumber, (stop.status === 'COLLECTED' || stop.status === 'SKIPPED') && styles.stopNumberCompleted]}>
-                <Text style={styles.stopNumberText}>{idx + 1}</Text>
-              </View>
-              {idx < trip.stops.length - 1 && <View style={styles.line} />}
-            </View>
-            <View style={styles.stopContent}>
-              <View style={styles.stopContentHeader}>
-                <Text style={styles.merchantName}>{stop.merchant?.name || 'Stop'}</Text>
-                <View style={[styles.badge, { backgroundColor: getStopStatusColor(stop.status) + '22' }]}>
-                  <Text style={[styles.badgeText, { color: getStopStatusColor(stop.status) }]}>{stop.status}</Text>
+        {/* DELIVERY & COLLECTION LEDGER TABLE (MATCHING PHOTO) */}
+        <TripLedgerTable trip={trip} onRefresh={fetchTripDetails} canEdit={true} />
+
+        {/* STOP CARDS TIMELINE */}
+        <Text style={styles.timelineTitle}>Route Stops ({trip.stops?.length || 0})</Text>
+        {trip.stops && trip.stops.map((stop: any, idx: number) => {
+          const isDelayed = stop.skipReason?.toLowerCase().includes('delayed') || stop.skipReason?.toLowerCase().includes('carry');
+          return (
+            <TouchableOpacity 
+              key={stop.id} 
+              style={styles.stopCard} 
+              onPress={() => router.push(`/driver/trips/${trip.id}/stop/${stop.id}` as any)}
+            >
+              <View style={styles.stopLeft}>
+                <View style={[styles.stopNumber, (stop.status === 'COLLECTED' || stop.status === 'SKIPPED') && styles.stopNumberCompleted]}>
+                  <Text style={styles.stopNumberText}>{idx + 1}</Text>
                 </View>
+                {idx < trip.stops.length - 1 && <View style={styles.line} />}
               </View>
-              <Text style={styles.boxText}>Address: {stop.merchant?.address || 'No Address'}</Text>
-              <Text style={styles.collectedText}>
-                {stop.status === 'COLLECTED' ? `Collected: ₹${stop.collectedAmount}` : 'Collection pending'}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        ))}
+              <View style={styles.stopContent}>
+                <View style={styles.stopContentHeader}>
+                  <Text style={styles.merchantName}>{stop.merchant?.name || 'Stop'}</Text>
+                  <View style={[styles.badge, { backgroundColor: isDelayed ? colors.warning + '22' : getStopStatusColor(stop.status) + '22' }]}>
+                    <Text style={[styles.badgeText, { color: isDelayed ? colors.warning : getStopStatusColor(stop.status) }]}>
+                      {isDelayed ? 'CARRY FWD' : stop.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.boxText}>Address: {stop.merchant?.address || 'No Address'}</Text>
+                <Text style={[styles.collectedText, isDelayed && { color: colors.warning }]}>
+                  {stop.status === 'COLLECTED' ? (isDelayed ? `Carry Forward: ₹${stop.collectedAmount || 0}` : `Collected: ₹${stop.collectedAmount || 0}`) : 'Pending Action'}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          );
+        })}
       </ScrollView>
     </SafeAreaView>
   );
@@ -191,7 +196,7 @@ const styles = StyleSheet.create({
   backBtn: { color: colors.primary, fontSize: 16, fontWeight: 'bold', marginRight: 16 },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.textPrimary },
   scroll: { padding: 16 },
-  summaryCard: { backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 24, borderWidth: 1, borderColor: colors.border },
+  summaryCard: { backgroundColor: colors.surface, padding: 16, borderRadius: 12, marginBottom: 16, borderWidth: 1, borderColor: colors.border },
   summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
   summaryTitle: { fontSize: 18, color: colors.textPrimary, fontWeight: 'bold' },
   statusBadge: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4 },
@@ -199,7 +204,7 @@ const styles = StyleSheet.create({
   actionBtn: { backgroundColor: colors.primary, borderRadius: 8, marginTop: 8 },
   
   // Timeline Styles
-  timelineTitle: { fontSize: 18, color: colors.textPrimary, fontWeight: 'bold', marginBottom: 16 },
+  timelineTitle: { fontSize: 18, color: colors.textPrimary, fontWeight: 'bold', marginTop: 12, marginBottom: 16 },
   stopCard: { flexDirection: 'row', marginBottom: 8 },
   stopLeft: { alignItems: 'center', marginRight: 12 },
   stopNumber: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.surfaceAlt, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.border },
@@ -217,10 +222,10 @@ const styles = StyleSheet.create({
   // Completion Form
   completionContainer: { marginTop: 16, padding: 12, backgroundColor: colors.surfaceAlt, borderRadius: 8, borderLeftWidth: 3, borderLeftColor: colors.secondary },
   completeHeader: { fontSize: 15, fontWeight: 'bold', color: colors.textPrimary, marginBottom: 12 },
-  feeInput: { backgroundColor: colors.surface, marginBottom: 12 },
   completeBtn: { backgroundColor: colors.secondary, borderRadius: 8 },
   
   feeLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingVertical: 8, borderTopWidth: 1, borderTopColor: colors.border },
   feeLabel: { color: colors.textSecondary, fontSize: 14 },
   feeValue: { color: colors.secondary, fontSize: 16, fontWeight: 'bold' }
 });
+

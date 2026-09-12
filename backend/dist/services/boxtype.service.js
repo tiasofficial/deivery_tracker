@@ -1,27 +1,35 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.deleteBoxType = exports.updateBoxType = exports.createBoxType = exports.getBoxTypes = void 0;
-const client_1 = require("@prisma/client");
-const prisma = new client_1.PrismaClient();
+const prisma_1 = require("../config/prisma");
 const getBoxTypes = async (vendorId) => {
-    return prisma.boxType.findMany({ where: { vendorId } });
+    return prisma_1.prisma.boxType.findMany({ where: { vendorId } });
 };
 exports.getBoxTypes = getBoxTypes;
 const createBoxType = async (vendorId, data) => {
-    return prisma.boxType.create({ data: { ...data, vendorId } });
+    return prisma_1.prisma.boxType.create({ data: { ...data, vendorId } });
 };
 exports.createBoxType = createBoxType;
 const updateBoxType = async (boxTypeId, vendorId, data) => {
-    const box = await prisma.boxType.findUnique({ where: { id: boxTypeId } });
+    const box = await prisma_1.prisma.boxType.findUnique({ where: { id: boxTypeId } });
     if (!box || box.vendorId !== vendorId)
         throw new Error('Box type not found');
-    return prisma.boxType.update({ where: { id: boxTypeId }, data });
+    return prisma_1.prisma.boxType.update({ where: { id: boxTypeId }, data });
 };
 exports.updateBoxType = updateBoxType;
 const deleteBoxType = async (boxTypeId, vendorId) => {
-    const box = await prisma.boxType.findUnique({ where: { id: boxTypeId } });
-    if (!box || box.vendorId !== vendorId)
+    const box = await prisma_1.prisma.boxType.findFirst({
+        where: {
+            OR: [{ id: boxTypeId }, { name: boxTypeId }],
+            vendorId
+        }
+    });
+    if (!box)
         throw new Error('Box type not found');
-    return prisma.boxType.delete({ where: { id: boxTypeId } });
+    try {
+        await prisma_1.prisma.routeStopBox.deleteMany({ where: { boxTypeId: box.id } });
+    }
+    catch (e) { }
+    return prisma_1.prisma.boxType.delete({ where: { id: box.id } });
 };
 exports.deleteBoxType = deleteBoxType;

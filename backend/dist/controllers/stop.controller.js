@@ -33,12 +33,12 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.skipStop = exports.collectAtStop = exports.deliverAtStop = exports.arriveAtStop = void 0;
+exports.skipStop = exports.updateStop = exports.collectAtStop = exports.deliverAtStop = exports.arriveAtStop = void 0;
 const stopService = __importStar(require("../services/stop.service"));
 const response_1 = require("../utils/response");
 const arriveAtStop = async (req, res, next) => {
     try {
-        const stop = await stopService.updateStopStatus(req.params.tripId, req.params.stopId, req.user.id, 'ARRIVED');
+        const stop = await stopService.updateStopStatus(req.params.tripId, req.params.stopId, req.user.id, 'ARRIVED', req.user.role);
         return (0, response_1.sendSuccess)(res, stop, 'Arrived at stop');
     }
     catch (error) {
@@ -48,7 +48,7 @@ const arriveAtStop = async (req, res, next) => {
 exports.arriveAtStop = arriveAtStop;
 const deliverAtStop = async (req, res, next) => {
     try {
-        const stop = await stopService.updateStopStatus(req.params.tripId, req.params.stopId, req.user.id, 'DELIVERED');
+        const stop = await stopService.updateStopStatus(req.params.tripId, req.params.stopId, req.user.id, 'DELIVERED', req.user.role);
         return (0, response_1.sendSuccess)(res, stop, 'Delivered at stop');
     }
     catch (error) {
@@ -58,7 +58,7 @@ const deliverAtStop = async (req, res, next) => {
 exports.deliverAtStop = deliverAtStop;
 const collectAtStop = async (req, res, next) => {
     try {
-        const stop = await stopService.collectAtStop(req.params.tripId, req.params.stopId, req.user.id, req.body.amount);
+        const stop = await stopService.collectAtStop(req.params.tripId, req.params.stopId, req.user.id, Number(req.body.amount || 0), req.body.remarks || req.body.reason || req.body.skipReason, req.user.role);
         return (0, response_1.sendSuccess)(res, stop, 'Collected at stop');
     }
     catch (error) {
@@ -66,9 +66,24 @@ const collectAtStop = async (req, res, next) => {
     }
 };
 exports.collectAtStop = collectAtStop;
+const updateStop = async (req, res, next) => {
+    try {
+        const stop = await stopService.updateStopDetails(req.params.tripId, req.params.stopId, req.user.id, req.user.role, {
+            collectedAmount: req.body.collectedAmount !== undefined ? Number(req.body.collectedAmount) : undefined,
+            status: req.body.status,
+            skipped: req.body.skipped,
+            skipReason: req.body.skipReason || req.body.remarks,
+        });
+        return (0, response_1.sendSuccess)(res, stop, 'Stop updated successfully');
+    }
+    catch (error) {
+        return (0, response_1.sendError)(res, error.message, 400);
+    }
+};
+exports.updateStop = updateStop;
 const skipStop = async (req, res, next) => {
     try {
-        const stop = await stopService.skipStop(req.params.tripId, req.params.stopId, req.user.id, req.body.reason);
+        const stop = await stopService.skipStop(req.params.tripId, req.params.stopId, req.user.id, req.body.reason, req.user.role);
         return (0, response_1.sendSuccess)(res, stop, 'Skipped stop');
     }
     catch (error) {

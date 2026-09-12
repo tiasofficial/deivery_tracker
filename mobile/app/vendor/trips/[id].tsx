@@ -7,6 +7,7 @@ import { Button, TextInput } from 'react-native-paper';
 import { getTripStatusColor, getStopStatusColor } from '@/utils/statusHelpers';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { api } from '@/services/api';
+import TripLedgerTable from '@/components/common/TripLedgerTable';
 
 export default function VendorTripDetail() {
   const { id: tripId } = useLocalSearchParams();
@@ -277,37 +278,47 @@ export default function VendorTripDetail() {
             )}
           </View>
 
-          <Text style={styles.timelineTitle}>Route Timeline</Text>
-          {trip.stops && trip.stops.map((stop: any, idx: number) => (
-            <View key={stop.id} style={styles.stopCard}>
-              <View style={styles.stopHeader}>
-                <Text style={styles.merchantName}>{idx + 1}. {stop.merchant?.name || 'Stop'}</Text>
-                <View style={[styles.badge, { backgroundColor: getStopStatusColor(stop.status) + '33' }]}>
-                  <Text style={[styles.badgeText, { color: getStopStatusColor(stop.status) }]}>{stop.status}</Text>
-                </View>
-              </View>
-              
-              <Text style={styles.boxText}>Address: {stop.merchant?.address || 'Manual Entry'}</Text>
-              
-              {stop.boxes && stop.boxes.length > 0 && (
-                <View style={styles.boxesList}>
-                  {stop.boxes.map((box: any, bIdx: number) => (
-                    <Text key={bIdx} style={styles.boxItem}>
-                      • {box.quantity}x {box.boxType?.name || 'Box'}
-                    </Text>
-                  ))}
-                </View>
-              )}
+          {/* DELIVERY & COLLECTION LEDGER TABLE (MATCHING PHOTO) */}
+          <TripLedgerTable trip={trip} onRefresh={fetchTripDetails} canEdit={true} />
 
-              {stop.status === 'COLLECTED' && (
-                <Text style={styles.collectedText}>Collected: {formatCurrency(Number(stop.collectedAmount || 0))}</Text>
-              )}
-              
-              {stop.status === 'SKIPPED' && (
-                <Text style={styles.skippedText}>Skipped: {stop.skipReason || 'No reason'}</Text>
-              )}
-            </View>
-          ))}
+          <Text style={styles.timelineTitle}>Route Timeline</Text>
+          {trip.stops && trip.stops.map((stop: any, idx: number) => {
+            const isDelayed = stop.skipReason?.toLowerCase().includes('delayed') || stop.skipReason?.toLowerCase().includes('carry');
+            return (
+              <View key={stop.id} style={styles.stopCard}>
+                <View style={styles.stopHeader}>
+                  <Text style={styles.merchantName}>{idx + 1}. {stop.merchant?.name || 'Stop'}</Text>
+                  <View style={[styles.badge, { backgroundColor: isDelayed ? colors.warning + '33' : getStopStatusColor(stop.status) + '33' }]}>
+                    <Text style={[styles.badgeText, { color: isDelayed ? colors.warning : getStopStatusColor(stop.status) }]}>
+                      {isDelayed ? 'CARRY FWD' : stop.status}
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={styles.boxText}>Address: {stop.merchant?.address || 'Manual Entry'}</Text>
+                
+                {stop.boxes && stop.boxes.length > 0 && (
+                  <View style={styles.boxesList}>
+                    {stop.boxes.map((box: any, bIdx: number) => (
+                      <Text key={bIdx} style={styles.boxItem}>
+                        • {box.quantity}x {box.boxType?.name || 'Box'}
+                      </Text>
+                    ))}
+                  </View>
+                )}
+
+                {stop.status === 'COLLECTED' && (
+                  <Text style={[styles.collectedText, isDelayed && { color: colors.warning }]}>
+                    {isDelayed ? `Carry Forward: ${formatCurrency(Number(stop.collectedAmount || 0))}` : `Collected: ${formatCurrency(Number(stop.collectedAmount || 0))}`}
+                  </Text>
+                )}
+                
+                {stop.status === 'SKIPPED' && (
+                  <Text style={styles.skippedText}>Skipped: {stop.skipReason || 'No reason'}</Text>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
