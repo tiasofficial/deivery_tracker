@@ -56,10 +56,15 @@ const collectAtStop = async (tripId, stopId, userId, amount, skipReason, role) =
             skipped: false
         },
     });
-    // Update trip total collected
+    // Update trip total collected and auto-complete if all stops done
     const trip = await prisma_1.prisma.trip.findUnique({ where: { id: tripId }, include: { stops: true } });
     const total = trip?.stops.reduce((acc, s) => acc + Number(s.collectedAmount || 0), 0) || 0;
-    await prisma_1.prisma.trip.update({ where: { id: tripId }, data: { totalCollected: total } });
+    const allCompleted = trip?.stops && trip.stops.length > 0 && trip.stops.every(s => s.status === 'COLLECTED' || s.status === 'SKIPPED');
+    const tripUpdateData = { totalCollected: total };
+    if (allCompleted && trip?.status !== 'COMPLETED' && trip?.status !== 'SETTLED') {
+        tripUpdateData.status = 'COMPLETED';
+    }
+    await prisma_1.prisma.trip.update({ where: { id: tripId }, data: tripUpdateData });
     return stop;
 };
 exports.collectAtStop = collectAtStop;
@@ -91,18 +96,32 @@ const updateStopDetails = async (tripId, stopId, userId, role, updateData) => {
             }
         }
     });
-    // Recalculate trip total collected
+    // Recalculate trip total collected and auto-complete if all stops done
     const trip = await prisma_1.prisma.trip.findUnique({ where: { id: tripId }, include: { stops: true } });
     const total = trip?.stops.reduce((acc, s) => acc + Number(s.collectedAmount || 0), 0) || 0;
-    await prisma_1.prisma.trip.update({ where: { id: tripId }, data: { totalCollected: total } });
+    const allCompleted = trip?.stops && trip.stops.length > 0 && trip.stops.every(s => s.status === 'COLLECTED' || s.status === 'SKIPPED');
+    const tripUpdateData = { totalCollected: total };
+    if (allCompleted && trip?.status !== 'COMPLETED' && trip?.status !== 'SETTLED') {
+        tripUpdateData.status = 'COMPLETED';
+    }
+    await prisma_1.prisma.trip.update({ where: { id: tripId }, data: tripUpdateData });
     return updatedStop;
 };
 exports.updateStopDetails = updateStopDetails;
 const skipStop = async (tripId, stopId, userId, reason, role) => {
     await verifyTripAndStop(tripId, stopId, userId, role);
-    return prisma_1.prisma.routeStop.update({
+    const updatedStop = await prisma_1.prisma.routeStop.update({
         where: { id: stopId },
         data: { status: 'SKIPPED', skipped: true, skipReason: reason, collectedAmount: 0 },
     });
+    const trip = await prisma_1.prisma.trip.findUnique({ where: { id: tripId }, include: { stops: true } });
+    const total = trip?.stops.reduce((acc, s) => acc + Number(s.collectedAmount || 0), 0) || 0;
+    const allCompleted = trip?.stops && trip.stops.length > 0 && trip.stops.every(s => s.status === 'COLLECTED' || s.status === 'SKIPPED');
+    const tripUpdateData = { totalCollected: total };
+    if (allCompleted && trip?.status !== 'COMPLETED' && trip?.status !== 'SETTLED') {
+        tripUpdateData.status = 'COMPLETED';
+    }
+    await prisma_1.prisma.trip.update({ where: { id: tripId }, data: tripUpdateData });
+    return updatedStop;
 };
 exports.skipStop = skipStop;
