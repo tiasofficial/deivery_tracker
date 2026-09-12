@@ -16,7 +16,8 @@ export default function DriverDashboard() {
   const navigation = useNavigation();
 
   // State
-  const [trips, setTrips] = useState<any[]>([]);
+  const [allTrips, setAllTrips] = useState<any[]>([]);
+  const [activeTrips, setActiveTrips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -24,11 +25,14 @@ export default function DriverDashboard() {
     try {
       const res = await api.get('/trips');
       if (res.data.success && res.data.data) {
-        // Driver sees ASSIGNED, IN_PROGRESS, and COMPLETED on the main page
-        const activeTrips = res.data.data.filter((t: any) => 
-          t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || t.status === 'COMPLETED'
+        const rawTrips = res.data.data;
+        setAllTrips(rawTrips);
+
+        // Active trips are those not yet SETTLED
+        const active = rawTrips.filter((t: any) => 
+          t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS' || (t.status === 'COMPLETED' && !t.isSettled)
         );
-        setTrips(activeTrips);
+        setActiveTrips(active);
       }
     } catch (error) {
       console.error('Failed to load driver trips:', error);
@@ -56,9 +60,9 @@ export default function DriverDashboard() {
     router.replace('/(auth)/login');
   };
 
-  // Calculate metrics for today (Trips not yet completed)
-  const activeTripsCount = trips.filter(t => t.status !== 'COMPLETED').length;
-  
+  const pendingCount = activeTrips.filter(t => t.status === 'ASSIGNED' || t.status === 'IN_PROGRESS').length;
+  const settledCount = allTrips.filter(t => t.status === 'SETTLED' || t.isSettled).length;
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView 
@@ -83,11 +87,13 @@ export default function DriverDashboard() {
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Active Trips</Text>
-            <Text style={styles.statValue}>{activeTripsCount}</Text>
+            <Text style={[styles.statValue, { color: pendingCount > 0 ? colors.warning : colors.textPrimary }]}>
+              {pendingCount}
+            </Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Total Trips</Text>
-            <Text style={styles.statValue}>{trips.length}</Text>
+            <Text style={styles.statValue}>{allTrips.length}</Text>
           </View>
         </View>
 
@@ -105,13 +111,31 @@ export default function DriverDashboard() {
         
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
-        ) : trips.length === 0 ? (
+        ) : activeTrips.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <Ionicons name="cube-outline" size={48} color={colors.textSecondary} />
-            <Text style={styles.emptyText}>No trips currently assigned to you.</Text>
+            <Ionicons name="checkmark-done-circle-outline" size={54} color={colors.success} />
+            <Text style={styles.emptyTitle}>
+              {allTrips.length > 0 ? 'All Trips Completed & Settled!' : 'No Active Trips'}
+            </Text>
+            <Text style={styles.emptySubtitle}>
+              {allTrips.length > 0 
+                ? `You have ${allTrips.length} finished delivery route(s). You can view all breakdown details in History.`
+                : 'No delivery routes are currently assigned to you by your vendor.'}
+            </Text>
+            {allTrips.length > 0 && (
+              <Button
+                mode="outlined"
+                icon="time-outline"
+                style={styles.historyBtn}
+                textColor={colors.primary}
+                onPress={() => router.push('/driver/history' as any)}
+              >
+                View Trip History ({allTrips.length})
+              </Button>
+            )}
           </View>
         ) : (
-          trips.map((trip) => (
+          activeTrips.map((trip) => (
             <TouchableOpacity 
               key={trip.id}
               style={styles.tripCard} 
@@ -162,7 +186,9 @@ const styles = StyleSheet.create({
   routeContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
   routeText: { color: colors.textSecondary, marginLeft: 8 },
   actionBtn: { backgroundColor: colors.primary, borderRadius: 8 },
-  emptyContainer: { alignItems: 'center', paddingVertical: 40 },
-  emptyText: { color: colors.textSecondary, marginTop: 12, fontSize: 15, textAlign: 'center' },
+  emptyContainer: { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20 },
+  emptyTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: 'bold', marginTop: 12, textAlign: 'center' },
+  emptySubtitle: { color: colors.textSecondary, marginTop: 6, fontSize: 13, textAlign: 'center', lineHeight: 18 },
+  historyBtn: { marginTop: 16, borderColor: colors.primary },
   requestBtn: { marginBottom: 24, borderRadius: 8 }
 });
