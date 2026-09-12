@@ -99,7 +99,7 @@ export default function DriverDashboard() {
 
         <Button
           mode="contained"
-          icon="truck-fast"
+          icon={({ size, color }) => <Ionicons name="car-outline" size={size || 18} color={color} />}
           style={styles.requestBtn}
           buttonColor={colors.secondary}
           onPress={() => router.push('/driver/request-pickup' as any)}
@@ -125,7 +125,7 @@ export default function DriverDashboard() {
             {allTrips.length > 0 && (
               <Button
                 mode="outlined"
-                icon="time-outline"
+                icon={({ size, color }) => <Ionicons name="time-outline" size={size || 18} color={color} />}
                 style={styles.historyBtn}
                 textColor={colors.primary}
                 onPress={() => router.push('/driver/history' as any)}

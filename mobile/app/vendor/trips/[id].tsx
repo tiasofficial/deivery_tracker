@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '@/constants/colors';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { Button, TextInput } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import { getTripStatusColor, getStopStatusColor } from '@/utils/statusHelpers';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { api } from '@/services/api';
@@ -267,7 +268,7 @@ export default function VendorTripDetail() {
                     onPress={handleStartEdit}
                     style={styles.editBeforeSettleBtn}
                     textColor={colors.warning}
-                    icon="pencil"
+                    icon={({ size, color }) => <Ionicons name="create-outline" size={size || 16} color={color} />}
                   >
                     {Number(trip.transportFee || 0) === 0 ? 'Set Transport Fee' : 'Edit Transport Fee / Amounts'}
                   </Button>

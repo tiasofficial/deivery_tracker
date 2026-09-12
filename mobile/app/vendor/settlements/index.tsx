@@ -307,7 +307,7 @@ export default function SettlementsScreen() {
                   mode="contained"
                   onPress={() => openReceiveModal(item)}
                   style={styles.receiveBtn}
-                  icon="checkbox-marked-circle-outline"
+                  icon={({ size, color }) => <Ionicons name="checkmark-circle-outline" size={size || 18} color={color} />}
                 >
                   Receive Cash & Set Fee
                 </Button>
@@ -364,7 +364,7 @@ export default function SettlementsScreen() {
                 style={styles.payAllBtn}
                 buttonColor={colors.secondary}
                 textColor="#0F0F1A"
-                icon="cash-multiple"
+                icon={({ size, color }) => <Ionicons name="cash-outline" size={size || 18} color={color} />}
               >
                 Pay All Fees to {item.driverName} ({formatCurrency(item.totalFee)})
               </Button>
