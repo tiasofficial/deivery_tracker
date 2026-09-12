@@ -354,7 +354,7 @@ export default function CreateTrip() {
                     placeholder="Type item name or choose chip"
                   />
                   <TextInput
-                    label="Qty"
+                    label={Platform.OS === 'web' ? "Quantity" : "Qty"}
                     value={box.quantity}
                     onChangeText={(qty) => updateBoxQuantity(stopIdx, boxIdx, qty)}
                     mode="outlined"
@@ -479,9 +479,17 @@ const styles = StyleSheet.create({
   itemsLabel: { color: colors.textSecondary, fontSize: 13, marginBottom: 8, marginTop: 4 },
   boxRow: { marginBottom: 14 },
   inputRow: { flexDirection: 'row', alignItems: 'center' },
-  itemNameInput: { flex: 1, backgroundColor: colors.surfaceAlt },
-  qtyInput: { width: 75, marginLeft: 8, backgroundColor: colors.surfaceAlt },
-  deleteBoxBtn: { margin: 0, marginLeft: 2 },
+  itemNameInput: { 
+    flex: Platform.OS === 'web' ? 2 : 1, 
+    maxWidth: Platform.OS === 'web' ? 360 : undefined, 
+    backgroundColor: colors.surfaceAlt 
+  },
+  qtyInput: { 
+    width: Platform.OS === 'web' ? 150 : 85, 
+    marginLeft: 10, 
+    backgroundColor: colors.surfaceAlt 
+  },
+  deleteBoxBtn: { margin: 0, marginLeft: 4 },
   boxChip: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
   boxChipSelected: { backgroundColor: colors.primary + '22', borderColor: colors.primary },
   boxChipText: { color: colors.textSecondary, fontSize: 12 },
