@@ -12,13 +12,90 @@ interface TripLedgerTableProps {
   canEdit?: boolean;
 }
 
+export interface StopFinancials {
+  totalBill: number;
+  collected: number;
+  due: number;
+  cleanRemarks: string;
+  isDelayed: boolean;
+  isCollected: boolean;
+  isSkipped: boolean;
+  isPending: boolean;
+}
+
+export function parseStopFinancials(stop: any): StopFinancials {
+  const rawCollected = Number(stop.collectedAmount || 0);
+  let totalBill = 0;
+  let collected = 0;
+  let due = 0;
+
+  const rawReason = stop.skipReason || '';
+  const billMatch = rawReason.match(/\[Bill:\s*([\d.]+)/i);
+  const dueMatch = rawReason.match(/\[Due:\s*([\d.]+)/i);
+
+  const isDelayed =
+    stop.status === 'DELAYED' ||
+    rawReason.toLowerCase().includes('delayed') ||
+    rawReason.toLowerCase().includes('carry') ||
+    rawReason.toLowerCase().includes('due');
+  const isSkipped = stop.status === 'SKIPPED';
+  const isCollected = stop.status === 'COLLECTED' && !isDelayed;
+  const isPending = !stop.status || stop.status === 'PENDING';
+
+  if (billMatch) {
+    totalBill = parseFloat(billMatch[1]) || 0;
+    if (dueMatch) {
+      due = parseFloat(dueMatch[1]) || 0;
+      collected = Math.max(0, totalBill - due);
+    } else {
+      collected = rawCollected;
+      due = Math.max(0, totalBill - collected);
+    }
+  } else {
+    // Legacy support for older records
+    if (isDelayed) {
+      if (rawCollected > 0) {
+        totalBill = rawCollected;
+        collected = 0; // The amount entered previously was the total bill / due amount
+        due = totalBill;
+      } else {
+        totalBill = 0;
+        collected = 0;
+        due = 0;
+      }
+    } else if (isCollected) {
+      totalBill = rawCollected;
+      collected = rawCollected;
+      due = 0;
+    } else {
+      totalBill = rawCollected;
+      collected = 0;
+      due = rawCollected;
+    }
+  }
+
+  const cleanRemarks = rawReason.replace(/\[Bill:\s*[\d.]+\s*\|\s*Due:\s*[\d.]+\]\s*/i, '').trim();
+
+  return {
+    totalBill,
+    collected,
+    due,
+    cleanRemarks,
+    isDelayed,
+    isCollected,
+    isSkipped,
+    isPending,
+  };
+}
+
 export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: TripLedgerTableProps) {
   const [selectedStop, setSelectedStop] = useState<any>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Edit fields
-  const [editAmount, setEditAmount] = useState('');
+  const [editTotalBill, setEditTotalBill] = useState('');
+  const [editCollected, setEditCollected] = useState('');
   const [editStatus, setEditStatus] = useState<'COLLECTED' | 'DELAYED' | 'SKIPPED' | 'PENDING'>('COLLECTED');
   const [editRemarks, setEditRemarks] = useState('');
 
@@ -52,8 +129,10 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
     boxTotals[col.id] = 0;
   });
 
+  let totalBillSum = 0;
   let totalCollectedSum = 0;
-  let totalStopsCount = trip.stops.length;
+  let totalDueSum = 0;
+  const totalStopsCount = trip.stops.length;
   let completedStopsCount = 0;
 
   trip.stops.forEach((stop: any) => {
@@ -65,46 +144,65 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
         }
       });
     }
-    if (stop.status === 'COLLECTED' || stop.collectedAmount) {
-      totalCollectedSum += Number(stop.collectedAmount || 0);
-    }
-    if (stop.status === 'COLLECTED' || stop.status === 'SKIPPED') {
+
+    const fin = parseStopFinancials(stop);
+    totalBillSum += fin.totalBill;
+    totalCollectedSum += fin.collected;
+    totalDueSum += fin.due;
+
+    if (stop.status === 'COLLECTED' || stop.status === 'SKIPPED' || fin.isDelayed) {
       completedStopsCount += 1;
     }
   });
 
   const openEditModal = (stop: any) => {
     setSelectedStop(stop);
-    setEditAmount(stop.collectedAmount !== null && stop.collectedAmount !== undefined ? String(stop.collectedAmount) : '');
-    if (stop.status === 'SKIPPED') {
+    const fin = parseStopFinancials(stop);
+
+    setEditTotalBill(fin.totalBill > 0 ? String(fin.totalBill) : '');
+    setEditCollected(fin.collected > 0 ? String(fin.collected) : fin.isDelayed ? '0' : '');
+
+    if (fin.isSkipped) {
       setEditStatus('SKIPPED');
-    } else if (stop.skipReason && (stop.skipReason.toLowerCase().includes('delayed') || stop.skipReason.toLowerCase().includes('carry'))) {
+    } else if (fin.isDelayed) {
       setEditStatus('DELAYED');
-    } else if (stop.status === 'COLLECTED') {
+    } else if (fin.isCollected) {
       setEditStatus('COLLECTED');
     } else {
       setEditStatus('PENDING');
     }
-    setEditRemarks(stop.skipReason || '');
+
+    setEditRemarks(fin.cleanRemarks || '');
     setModalVisible(true);
   };
+
+  // Live computed due amount in modal
+  const billNum = parseFloat(editTotalBill || '0') || 0;
+  const collectedNum = parseFloat(editCollected || '0') || 0;
+  const computedDue = Math.max(0, billNum - collectedNum);
 
   const handleSaveStop = async () => {
     if (!selectedStop) return;
     setSaving(true);
     try {
-      let finalStatus = editStatus === 'DELAYED' ? 'COLLECTED' : editStatus;
-      let finalAmount = editStatus === 'DELAYED' && !editAmount ? 0 : parseFloat(editAmount || '0');
-      let finalReason = editRemarks;
-      if (editStatus === 'DELAYED' && !finalReason) {
-        finalReason = 'Delayed / Carry forward to next trip';
+      const finalBill = parseFloat(editTotalBill || '0') || 0;
+      const finalCollected = parseFloat(editCollected || '0') || 0;
+      const finalDue = Math.max(0, finalBill - finalCollected);
+
+      const finalStatus = editStatus === 'DELAYED' ? 'COLLECTED' : editStatus;
+      let userRemarks = editRemarks.trim();
+      if (editStatus === 'DELAYED' && !userRemarks) {
+        userRemarks = 'Delayed / Carry forward to next trip';
       }
 
+      // Encode structured billing financials into skipReason for lossless persistence
+      const fullReason = `[Bill: ${finalBill} | Due: ${finalDue}] ${userRemarks}`.trim();
+
       await api.patch('/trips/' + trip.id + '/stops/' + selectedStop.id, {
-        collectedAmount: finalAmount,
+        collectedAmount: finalCollected,
         status: finalStatus,
         skipped: editStatus === 'SKIPPED',
-        skipReason: finalReason,
+        skipReason: fullReason,
       });
 
       setModalVisible(false);
@@ -139,23 +237,23 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
           <View style={[styles.row, styles.headerRow]}>
             <Text style={[styles.cell, styles.colNo, styles.headerText]}>NO</Text>
             <Text style={[styles.cell, styles.colCustomer, styles.headerText]}>CUSTOMER NAME</Text>
-            
+
             {boxTypeColumns.map(col => (
               <Text key={col.id} style={[styles.cell, styles.colBox, styles.headerText]}>
                 {col.name.toUpperCase()}
               </Text>
             ))}
 
-            <Text style={[styles.cell, styles.colAmount, styles.headerText]}>AMOUNT</Text>
+            <Text style={[styles.cell, styles.colTotalAmt, styles.headerText]}>TOTAL AMT</Text>
+            <Text style={[styles.cell, styles.colCollected, styles.headerText]}>COLLECTED</Text>
+            <Text style={[styles.cell, styles.colDue, styles.headerText]}>DUE / CARRY FWD</Text>
             <Text style={[styles.cell, styles.colStatus, styles.headerText]}>STATUS / REMARKS</Text>
             {canEdit && <Text style={[styles.cell, styles.colAction, styles.headerText]}>EDIT</Text>}
           </View>
 
           {/* TABLE ROWS */}
           {trip.stops.map((stop: any, idx: number) => {
-            const isDelayed = stop.skipReason && (stop.skipReason.toLowerCase().includes('delayed') || stop.skipReason.toLowerCase().includes('carry'));
-            const isCollected = stop.status === 'COLLECTED';
-            const isSkipped = stop.status === 'SKIPPED';
+            const fin = parseStopFinancials(stop);
 
             return (
               <TouchableOpacity
@@ -187,22 +285,34 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                   );
                 })}
 
-                {/* Amount */}
-                <Text style={[styles.cell, styles.colAmount, styles.amountText]}>
-                  {formatCurrency(Number(stop.collectedAmount || 0))}
+                {/* Total Bill Amount */}
+                <Text style={[styles.cell, styles.colTotalAmt, styles.billText]}>
+                  {formatCurrency(fin.totalBill)}
                 </Text>
+
+                {/* Collected Amount */}
+                <Text style={[styles.cell, styles.colCollected, styles.collectedText]}>
+                  {formatCurrency(fin.collected)}
+                </Text>
+
+                {/* Due / Carry Forward Amount */}
+                <View style={[styles.cell, styles.colDue]}>
+                  <Text style={[styles.dueText, fin.due > 0 ? styles.dueTextPositive : styles.dueTextZero]}>
+                    {formatCurrency(fin.due)}
+                  </Text>
+                </View>
 
                 {/* Status / Remarks */}
                 <View style={[styles.cell, styles.colStatus]}>
-                  {isDelayed ? (
+                  {fin.isDelayed ? (
                     <View style={[styles.statusBadge, { backgroundColor: colors.warning + '33' }]}>
                       <Text style={[styles.statusBadgeText, { color: colors.warning }]}>DELAYED / CARRY FWD</Text>
                     </View>
-                  ) : isCollected ? (
+                  ) : fin.isCollected ? (
                     <View style={[styles.statusBadge, { backgroundColor: colors.success + '33' }]}>
                       <Text style={[styles.statusBadgeText, { color: colors.success }]}>PAID / COLLECTED</Text>
                     </View>
-                  ) : isSkipped ? (
+                  ) : fin.isSkipped ? (
                     <View style={[styles.statusBadge, { backgroundColor: colors.error + '33' }]}>
                       <Text style={[styles.statusBadgeText, { color: colors.error }]}>SKIPPED</Text>
                     </View>
@@ -211,9 +321,9 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                       <Text style={[styles.statusBadgeText, { color: colors.textSecondary }]}>PENDING</Text>
                     </View>
                   )}
-                  {stop.skipReason ? (
+                  {fin.cleanRemarks ? (
                     <Text style={styles.remarkSnippet} numberOfLines={1}>
-                      {stop.skipReason}
+                      {fin.cleanRemarks}
                     </Text>
                   ) : null}
                 </View>
@@ -243,9 +353,21 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
               </Text>
             ))}
 
-            <Text style={[styles.cell, styles.colAmount, styles.totalAmountValue]}>
+            {/* Total Bill Sum */}
+            <Text style={[styles.cell, styles.colTotalAmt, styles.totalBillValue]}>
+              {formatCurrency(totalBillSum)}
+            </Text>
+
+            {/* Total Collected Sum */}
+            <Text style={[styles.cell, styles.colCollected, styles.totalCollectedValue]}>
               {formatCurrency(totalCollectedSum)}
             </Text>
+
+            {/* Total Due Sum */}
+            <Text style={[styles.cell, styles.colDue, styles.totalDueValue]}>
+              {formatCurrency(totalDueSum)}
+            </Text>
+
             <Text style={[styles.cell, styles.colStatus, styles.totalSubText]}>
               {completedStopsCount} of {totalStopsCount} completed
             </Text>
@@ -266,7 +388,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
             </View>
 
             {selectedStop && (
-              <ScrollView>
+              <ScrollView keyboardShouldPersistTaps="handled">
                 <Text style={styles.modalMerchantName}>{selectedStop.merchant?.name}</Text>
                 <Text style={styles.modalMerchantAddress}>{selectedStop.merchant?.address || 'No address'}</Text>
 
@@ -274,7 +396,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                   <Text style={styles.deliveryItemsTitle}>Items to deliver:</Text>
                   {selectedStop.boxes?.map((b: any, idx: number) => (
                     <Text key={idx} style={styles.deliveryItemText}>
-                      - {b.quantity}x {b.boxType?.name || 'Box'}
+                      • {b.quantity}x {b.boxType?.name || 'Box'}
                     </Text>
                   ))}
                 </View>
@@ -284,13 +406,19 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                 <View style={styles.chipRow}>
                   <TouchableOpacity
                     style={[styles.statusChip, editStatus === 'COLLECTED' && styles.statusChipActiveGreen]}
-                    onPress={() => setEditStatus('COLLECTED')}
+                    onPress={() => {
+                      setEditStatus('COLLECTED');
+                      // If collected is 0 or empty, default collected to total bill
+                      if (billNum > 0 && (collectedNum === 0 || !editCollected)) {
+                        setEditCollected(String(billNum));
+                      }
+                    }}
                   >
-                    <Ionicons 
-                      name="checkmark-circle" 
-                      size={15} 
-                      color={editStatus === 'COLLECTED' ? colors.success : colors.textSecondary} 
-                      style={{ marginRight: 4 }} 
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={15}
+                      color={editStatus === 'COLLECTED' ? colors.success : colors.textSecondary}
+                      style={{ marginRight: 4 }}
                     />
                     <Text style={[styles.chipText, editStatus === 'COLLECTED' && styles.chipTextActive]}>
                       Paid / Collected
@@ -301,14 +429,18 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'DELAYED' && styles.statusChipActiveOrange]}
                     onPress={() => {
                       setEditStatus('DELAYED');
+                      // If collected was equal to bill, reset to 0 for full carry forward
+                      if (collectedNum === billNum && billNum > 0) {
+                        setEditCollected('0');
+                      }
                       if (!editRemarks) setEditRemarks('Delayed / Carry forward to next trip');
                     }}
                   >
-                    <Ionicons 
-                      name="time-outline" 
-                      size={15} 
-                      color={editStatus === 'DELAYED' ? colors.warning : colors.textSecondary} 
-                      style={{ marginRight: 4 }} 
+                    <Ionicons
+                      name="time-outline"
+                      size={15}
+                      color={editStatus === 'DELAYED' ? colors.warning : colors.textSecondary}
+                      style={{ marginRight: 4 }}
                     />
                     <Text style={[styles.chipText, editStatus === 'DELAYED' && styles.chipTextActive]}>
                       Carry Forward / Due
@@ -321,11 +453,11 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'PENDING' && styles.statusChipActiveGray]}
                     onPress={() => setEditStatus('PENDING')}
                   >
-                    <Ionicons 
-                      name="hourglass-outline" 
-                      size={15} 
-                      color={editStatus === 'PENDING' ? colors.primary : colors.textSecondary} 
-                      style={{ marginRight: 4 }} 
+                    <Ionicons
+                      name="hourglass-outline"
+                      size={15}
+                      color={editStatus === 'PENDING' ? colors.primary : colors.textSecondary}
+                      style={{ marginRight: 4 }}
                     />
                     <Text style={[styles.chipText, editStatus === 'PENDING' && styles.chipTextActive]}>
                       Pending
@@ -336,11 +468,11 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'SKIPPED' && styles.statusChipActiveRed]}
                     onPress={() => setEditStatus('SKIPPED')}
                   >
-                    <Ionicons 
-                      name="close-circle" 
-                      size={15} 
-                      color={editStatus === 'SKIPPED' ? colors.error : colors.textSecondary} 
-                      style={{ marginRight: 4 }} 
+                    <Ionicons
+                      name="close-circle"
+                      size={15}
+                      color={editStatus === 'SKIPPED' ? colors.error : colors.textSecondary}
+                      style={{ marginRight: 4 }}
                     />
                     <Text style={[styles.chipText, editStatus === 'SKIPPED' && styles.chipTextActive]}>
                       Skipped
@@ -348,16 +480,51 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                   </TouchableOpacity>
                 </View>
 
-                {/* Amount Input */}
-                <TextInput
-                  label="Amount Collected"
-                  value={editAmount}
-                  onChangeText={setEditAmount}
-                  keyboardType="numeric"
-                  mode="outlined"
-                  style={styles.input}
-                  placeholder={editStatus === 'DELAYED' ? '0' : 'Enter amount'}
-                />
+                {/* Amount Inputs: Total Bill & Collected Cash */}
+                <View style={{ marginTop: 12 }}>
+                  <TextInput
+                    label="Total Bill / Expected Amount (₹)"
+                    value={editTotalBill}
+                    onChangeText={text => {
+                      setEditTotalBill(text);
+                      if (editStatus === 'COLLECTED' && (!editCollected || editCollected === editTotalBill)) {
+                        setEditCollected(text);
+                      }
+                    }}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    style={styles.input}
+                    placeholder="e.g. 5000"
+                  />
+
+                  <TextInput
+                    label="Cash Amount Collected (₹)"
+                    value={editCollected}
+                    onChangeText={setEditCollected}
+                    keyboardType="numeric"
+                    mode="outlined"
+                    style={styles.input}
+                    placeholder={editStatus === 'DELAYED' ? '0' : 'e.g. 5000'}
+                  />
+                </View>
+
+                {/* Logical Payment Due Banner: Total - Collected = Due */}
+                <View style={styles.dueCalculationBanner}>
+                  <View style={styles.dueCalculationRow}>
+                    <Text style={styles.dueCalculationLabel}>Due / Carry Forward Amount:</Text>
+                    <Text
+                      style={[
+                        styles.dueCalculationValue,
+                        computedDue > 0 ? { color: colors.warning } : { color: colors.success },
+                      ]}
+                    >
+                      {formatCurrency(computedDue)}
+                    </Text>
+                  </View>
+                  <Text style={styles.dueCalculationFormula}>
+                    Formula: Total ({formatCurrency(billNum)}) − Collected ({formatCurrency(collectedNum)}) = Due ({formatCurrency(computedDue)})
+                  </Text>
+                </View>
 
                 {/* Remarks / Reason Input */}
                 <TextInput
@@ -492,10 +659,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginTop: 2,
   },
-  amountText: {
+  billText: {
+    color: colors.textPrimary,
+    fontWeight: '600',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  collectedText: {
     color: colors.success,
     fontWeight: 'bold',
-    fontSize: 13,
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  dueText: {
+    fontWeight: 'bold',
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  dueTextPositive: {
+    color: colors.warning,
+  },
+  dueTextZero: {
+    color: colors.textSecondary,
   },
   totalText: {
     color: colors.secondary,
@@ -506,12 +691,26 @@ const styles = StyleSheet.create({
   totalValue: {
     color: colors.textPrimary,
     fontWeight: 'bold',
-    fontSize: 14,
+    fontSize: 13,
+    textAlign: 'center',
   },
-  totalAmountValue: {
+  totalBillValue: {
+    color: colors.textPrimary,
+    fontWeight: 'bold',
+    fontSize: 13,
+    textAlign: 'right',
+  },
+  totalCollectedValue: {
     color: colors.success,
     fontWeight: 'bold',
-    fontSize: 15,
+    fontSize: 14,
+    textAlign: 'right',
+  },
+  totalDueValue: {
+    color: colors.warning,
+    fontWeight: 'bold',
+    fontSize: 14,
+    textAlign: 'right',
   },
   totalSubText: {
     color: colors.textSecondary,
@@ -521,10 +720,12 @@ const styles = StyleSheet.create({
 
   // Column Widths
   colNo: { width: 44, textAlign: 'center', alignItems: 'center' },
-  colCustomer: { width: 150 },
-  colBox: { width: 90, textAlign: 'center', alignItems: 'center' },
-  colAmount: { width: 110, textAlign: 'right' },
-  colStatus: { width: 140 },
+  colCustomer: { width: 140 },
+  colBox: { width: 85, textAlign: 'center', alignItems: 'center' },
+  colTotalAmt: { width: 100, textAlign: 'right' },
+  colCollected: { width: 100, textAlign: 'right' },
+  colDue: { width: 110, textAlign: 'right' },
+  colStatus: { width: 145 },
   colAction: { width: 50, alignItems: 'center', justifyContent: 'center' },
 
   statusBadge: {
@@ -556,7 +757,7 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.7)',
+    backgroundColor: 'rgba(0,0,0,0.75)',
     justifyContent: 'center',
     padding: 16,
   },
@@ -566,7 +767,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderWidth: 1,
     borderColor: colors.border,
-    maxHeight: '85%',
+    maxHeight: '90%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -661,12 +862,40 @@ const styles = StyleSheet.create({
   },
   input: {
     backgroundColor: colors.surfaceAlt,
-    marginTop: 12,
+    marginBottom: 10,
+  },
+  dueCalculationBanner: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  dueCalculationRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  dueCalculationLabel: {
+    color: colors.textPrimary,
+    fontSize: 13,
+    fontWeight: 'bold',
+  },
+  dueCalculationValue: {
+    fontSize: 15,
+    fontWeight: 'bold',
+  },
+  dueCalculationFormula: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   modalBtnRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 20,
+    marginTop: 16,
     marginBottom: 8,
   },
   saveBtn: {

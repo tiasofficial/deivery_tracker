@@ -7,7 +7,7 @@ import { Button, TextInput } from 'react-native-paper';
 import { getTripStatusColor, getStopStatusColor } from '@/utils/statusHelpers';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { api } from '@/services/api';
-import TripLedgerTable from '@/components/common/TripLedgerTable';
+import TripLedgerTable, { parseStopFinancials } from '@/components/common/TripLedgerTable';
 
 export default function VendorTripDetail() {
   const { id: tripId } = useLocalSearchParams();
@@ -132,6 +132,14 @@ export default function VendorTripDetail() {
 
   const canEdit = trip.status === 'COMPLETED' && !trip.isSettled;
 
+  let totalDueAmount = 0;
+  if (trip?.stops && Array.isArray(trip.stops)) {
+    trip.stops.forEach((s: any) => {
+      const fin = parseStopFinancials(s);
+      totalDueAmount += fin.due;
+    });
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -228,6 +236,15 @@ export default function VendorTripDetail() {
                     {formatCurrency(Number(trip.totalCollected || 0))}
                   </Text>
                 </View>
+
+                {totalDueAmount > 0 && (
+                  <View style={styles.row}>
+                    <Text style={styles.label}>Due / Carry Forward:</Text>
+                    <Text style={[styles.value, { color: colors.warning, fontSize: 16 }]}>
+                      {formatCurrency(totalDueAmount)}
+                    </Text>
+                  </View>
+                )}
 
                 <View style={styles.row}>
                   <Text style={styles.label}>Transport Fee:</Text>

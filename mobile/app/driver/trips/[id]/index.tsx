@@ -5,8 +5,9 @@ import colors from '@/constants/colors';
 import { useLocalSearchParams, useRouter, useNavigation } from 'expo-router';
 import { Button } from 'react-native-paper';
 import { getStopStatusColor } from '@/utils/statusHelpers';
+import { formatCurrency } from '@/utils/formatCurrency';
 import { api } from '@/services/api';
-import TripLedgerTable from '@/components/common/TripLedgerTable';
+import TripLedgerTable, { parseStopFinancials } from '@/components/common/TripLedgerTable';
 
 export default function TripOverview() {
   const { id: tripId } = useLocalSearchParams();
@@ -140,11 +141,11 @@ export default function TripOverview() {
           {/* DISPLAY TRANSPORT FEE AND COLLECTED AMOUNT */}
           <View style={styles.feeLabelRow}>
             <Text style={styles.feeLabel}>Total Cash Collected:</Text>
-            <Text style={[styles.feeValue, { color: colors.success }]}>₹{trip.totalCollected || 0}</Text>
+            <Text style={[styles.feeValue, { color: colors.success }]}>{formatCurrency(Number(trip.totalCollected || 0))}</Text>
           </View>
           <View style={styles.feeLabelRow}>
             <Text style={styles.feeLabel}>Transport Fee:</Text>
-            <Text style={[styles.feeValue, { color: colors.secondary }]}>₹{trip.transportFee || 0}</Text>
+            <Text style={[styles.feeValue, { color: colors.secondary }]}>{formatCurrency(Number(trip.transportFee || 0))}</Text>
           </View>
         </View>
 
@@ -154,7 +155,7 @@ export default function TripOverview() {
         {/* STOP CARDS TIMELINE */}
         <Text style={styles.timelineTitle}>Route Stops ({trip.stops?.length || 0})</Text>
         {trip.stops && trip.stops.map((stop: any, idx: number) => {
-          const isDelayed = stop.skipReason?.toLowerCase().includes('delayed') || stop.skipReason?.toLowerCase().includes('carry');
+          const fin = parseStopFinancials(stop);
           return (
             <TouchableOpacity 
               key={stop.id} 
@@ -170,15 +171,19 @@ export default function TripOverview() {
               <View style={styles.stopContent}>
                 <View style={styles.stopContentHeader}>
                   <Text style={styles.merchantName}>{stop.merchant?.name || 'Stop'}</Text>
-                  <View style={[styles.badge, { backgroundColor: isDelayed ? colors.warning + '22' : getStopStatusColor(stop.status) + '22' }]}>
-                    <Text style={[styles.badgeText, { color: isDelayed ? colors.warning : getStopStatusColor(stop.status) }]}>
-                      {isDelayed ? 'CARRY FWD' : stop.status}
+                  <View style={[styles.badge, { backgroundColor: fin.isDelayed ? colors.warning + '22' : getStopStatusColor(stop.status) + '22' }]}>
+                    <Text style={[styles.badgeText, { color: fin.isDelayed ? colors.warning : getStopStatusColor(stop.status) }]}>
+                      {fin.isDelayed ? 'CARRY FWD' : stop.status}
                     </Text>
                   </View>
                 </View>
                 <Text style={styles.boxText}>Address: {stop.merchant?.address || 'No Address'}</Text>
-                <Text style={[styles.collectedText, isDelayed && { color: colors.warning }]}>
-                  {stop.status === 'COLLECTED' ? (isDelayed ? `Carry Forward: ₹${stop.collectedAmount || 0}` : `Collected: ₹${stop.collectedAmount || 0}`) : 'Pending Action'}
+                <Text style={[styles.collectedText, fin.isDelayed && { color: colors.warning }]}>
+                  {stop.status === 'COLLECTED'
+                    ? fin.isDelayed
+                      ? `Carry Fwd Due: ${formatCurrency(fin.due)}${fin.collected > 0 ? ` (Paid: ${formatCurrency(fin.collected)})` : ''}`
+                      : `Collected: ${formatCurrency(fin.collected)}`
+                    : 'Pending Action'}
                 </Text>
               </View>
             </TouchableOpacity>
