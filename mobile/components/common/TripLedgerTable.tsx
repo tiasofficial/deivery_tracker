@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Alert } from 'react-native';
 import { Button, TextInput, Chip } from 'react-native-paper';
+import { Ionicons } from '@expo/vector-icons';
 import colors from '@/constants/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { api } from '@/services/api';
@@ -56,7 +57,6 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
   let completedStopsCount = 0;
 
   trip.stops.forEach((stop: any) => {
-    // Sum boxes
     if (stop.boxes && Array.isArray(stop.boxes)) {
       stop.boxes.forEach((b: any) => {
         const id = b.boxTypeId || b.boxType?.id || b.boxType?.name || 'unknown';
@@ -65,7 +65,6 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
         }
       });
     }
-    // Sum collected
     if (stop.status === 'COLLECTED' || stop.collectedAmount) {
       totalCollectedSum += Number(stop.collectedAmount || 0);
     }
@@ -79,7 +78,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
     setEditAmount(stop.collectedAmount !== null && stop.collectedAmount !== undefined ? String(stop.collectedAmount) : '');
     if (stop.status === 'SKIPPED') {
       setEditStatus('SKIPPED');
-    } else if (stop.skipReason?.toLowerCase().includes('delayed') || stop.skipReason?.toLowerCase().includes('carry')) {
+    } else if (stop.skipReason && (stop.skipReason.toLowerCase().includes('delayed') || stop.skipReason.toLowerCase().includes('carry'))) {
       setEditStatus('DELAYED');
     } else if (stop.status === 'COLLECTED') {
       setEditStatus('COLLECTED');
@@ -98,10 +97,10 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
       let finalAmount = editStatus === 'DELAYED' && !editAmount ? 0 : parseFloat(editAmount || '0');
       let finalReason = editRemarks;
       if (editStatus === 'DELAYED' && !finalReason) {
-        finalReason = 'Delayed / Carry Forward to next trip';
+        finalReason = 'Delayed / Carry forward to next trip';
       }
 
-      await api.patch(`/trips/${trip.id}/stops/${selectedStop.id}`, {
+      await api.patch('/trips/' + trip.id + '/stops/' + selectedStop.id, {
         collectedAmount: finalAmount,
         status: finalStatus,
         skipped: editStatus === 'SKIPPED',
@@ -120,11 +119,14 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
   return (
     <View style={styles.container}>
       <View style={styles.tableHeaderSection}>
-        <View>
-          <Text style={styles.tableHeading}>?? Delivery & Collection Sheet</Text>
-          <Text style={styles.tableSubheading}>
-            Date: {new Date(trip.tripDate).toLocaleDateString()} • Driver: {trip.driver?.name || 'Assigned'}
-          </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Ionicons name="receipt-outline" size={20} color={colors.primary} style={{ marginRight: 8 }} />
+          <View>
+            <Text style={styles.tableHeading}>Delivery & Collection Sheet</Text>
+            <Text style={styles.tableSubheading}>
+              Date: {new Date(trip.tripDate).toLocaleDateString()} | Driver: {trip.driver?.name || 'Assigned'}
+            </Text>
+          </View>
         </View>
         <Chip style={styles.progressChip} textStyle={{ color: colors.secondary, fontSize: 11 }}>
           {completedStopsCount}/{totalStopsCount} Stops
@@ -144,14 +146,14 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
               </Text>
             ))}
 
-            <Text style={[styles.cell, styles.colAmount, styles.headerText]}>AMOUNT (?)</Text>
+            <Text style={[styles.cell, styles.colAmount, styles.headerText]}>AMOUNT</Text>
             <Text style={[styles.cell, styles.colStatus, styles.headerText]}>STATUS / REMARKS</Text>
             {canEdit && <Text style={[styles.cell, styles.colAction, styles.headerText]}>EDIT</Text>}
           </View>
 
           {/* TABLE ROWS */}
           {trip.stops.map((stop: any, idx: number) => {
-            const isDelayed = stop.skipReason?.toLowerCase().includes('delayed') || stop.skipReason?.toLowerCase().includes('carry');
+            const isDelayed = stop.skipReason && (stop.skipReason.toLowerCase().includes('delayed') || stop.skipReason.toLowerCase().includes('carry'));
             const isCollected = stop.status === 'COLLECTED';
             const isSkipped = stop.status === 'SKIPPED';
 
@@ -187,9 +189,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
 
                 {/* Amount */}
                 <Text style={[styles.cell, styles.colAmount, styles.amountText]}>
-                  {stop.collectedAmount !== null && stop.collectedAmount !== undefined
-                    ? `?${Number(stop.collectedAmount).toLocaleString('en-IN')}`
-                    : '?0'}
+                  {formatCurrency(Number(stop.collectedAmount || 0))}
                 </Text>
 
                 {/* Status / Remarks */}
@@ -222,7 +222,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                 {canEdit && (
                   <View style={[styles.cell, styles.colAction]}>
                     <TouchableOpacity style={styles.editIconBtn} onPress={() => openEditModal(stop)}>
-                      <Text style={{ fontSize: 14 }}>??</Text>
+                      <Ionicons name="create-outline" size={16} color={colors.secondary} />
                     </TouchableOpacity>
                   </View>
                 )}
@@ -230,9 +230,11 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
             );
           })}
 
-          {/* TOTAL ROW (matching user photo) */}
+          {/* TOTAL ROW */}
           <View style={[styles.row, styles.totalRow]}>
-            <Text style={[styles.cell, styles.colNo, styles.totalText]}>?</Text>
+            <View style={[styles.cell, styles.colNo, { alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="checkmark-done" size={16} color={colors.secondary} />
+            </View>
             <Text style={[styles.cell, styles.colCustomer, styles.totalText]}>TOTAL</Text>
 
             {boxTypeColumns.map(col => (
@@ -242,7 +244,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
             ))}
 
             <Text style={[styles.cell, styles.colAmount, styles.totalAmountValue]}>
-              ?{totalCollectedSum.toLocaleString('en-IN')}
+              {formatCurrency(totalCollectedSum)}
             </Text>
             <Text style={[styles.cell, styles.colStatus, styles.totalSubText]}>
               {completedStopsCount} of {totalStopsCount} completed
@@ -259,7 +261,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Stop & Payment</Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <Text style={styles.closeBtnText}>?</Text>
+                <Ionicons name="close" size={22} color={colors.textSecondary} />
               </TouchableOpacity>
             </View>
 
@@ -272,7 +274,7 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                   <Text style={styles.deliveryItemsTitle}>Items to deliver:</Text>
                   {selectedStop.boxes?.map((b: any, idx: number) => (
                     <Text key={idx} style={styles.deliveryItemText}>
-                      • {b.quantity}x {b.boxType?.name || 'Box'}
+                      - {b.quantity}x {b.boxType?.name || 'Box'}
                     </Text>
                   ))}
                 </View>
@@ -284,8 +286,14 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'COLLECTED' && styles.statusChipActiveGreen]}
                     onPress={() => setEditStatus('COLLECTED')}
                   >
+                    <Ionicons 
+                      name="checkmark-circle" 
+                      size={15} 
+                      color={editStatus === 'COLLECTED' ? colors.success : colors.textSecondary} 
+                      style={{ marginRight: 4 }} 
+                    />
                     <Text style={[styles.chipText, editStatus === 'COLLECTED' && styles.chipTextActive]}>
-                      ? Paid / Collected
+                      Paid / Collected
                     </Text>
                   </TouchableOpacity>
 
@@ -296,8 +304,14 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                       if (!editRemarks) setEditRemarks('Delayed / Carry forward to next trip');
                     }}
                   >
+                    <Ionicons 
+                      name="time-outline" 
+                      size={15} 
+                      color={editStatus === 'DELAYED' ? colors.warning : colors.textSecondary} 
+                      style={{ marginRight: 4 }} 
+                    />
                     <Text style={[styles.chipText, editStatus === 'DELAYED' && styles.chipTextActive]}>
-                      ? Carry Forward / Due
+                      Carry Forward / Due
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -307,8 +321,14 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'PENDING' && styles.statusChipActiveGray]}
                     onPress={() => setEditStatus('PENDING')}
                   >
+                    <Ionicons 
+                      name="hourglass-outline" 
+                      size={15} 
+                      color={editStatus === 'PENDING' ? colors.primary : colors.textSecondary} 
+                      style={{ marginRight: 4 }} 
+                    />
                     <Text style={[styles.chipText, editStatus === 'PENDING' && styles.chipTextActive]}>
-                      ? Pending
+                      Pending
                     </Text>
                   </TouchableOpacity>
 
@@ -316,15 +336,21 @@ export default function TripLedgerTable({ trip, onRefresh, canEdit = true }: Tri
                     style={[styles.statusChip, editStatus === 'SKIPPED' && styles.statusChipActiveRed]}
                     onPress={() => setEditStatus('SKIPPED')}
                   >
+                    <Ionicons 
+                      name="close-circle" 
+                      size={15} 
+                      color={editStatus === 'SKIPPED' ? colors.error : colors.textSecondary} 
+                      style={{ marginRight: 4 }} 
+                    />
                     <Text style={[styles.chipText, editStatus === 'SKIPPED' && styles.chipTextActive]}>
-                      ? Skipped
+                      Skipped
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Amount Input */}
                 <TextInput
-                  label="Amount Collected (?)"
+                  label="Amount Collected"
                   value={editAmount}
                   onChangeText={setEditAmount}
                   keyboardType="numeric"
@@ -556,11 +582,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: colors.textPrimary,
   },
-  closeBtnText: {
-    fontSize: 18,
-    color: colors.textSecondary,
-    padding: 4,
-  },
   modalMerchantName: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -603,6 +624,7 @@ const styles = StyleSheet.create({
   },
   statusChip: {
     flex: 1,
+    flexDirection: 'row',
     paddingVertical: 8,
     paddingHorizontal: 10,
     borderRadius: 8,
